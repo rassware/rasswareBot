@@ -16,7 +16,6 @@ class DataProvider:
     humiField = "humidity_dec"
     lastAlert = datetime.datetime.now()
     lastCheck = datetime.datetime.now()
-    chatIdsForAlert = set()
 
     def __init__(self, db):
         self.db = db
@@ -33,6 +32,7 @@ class DataProvider:
             data.extend("Keine Klimadaten gefunden!")
         else:
             for row in cur.fetchall():
+                print row
                 messzeit = str(row[2])
                 sensor = str(row[0])
                 id = int(row[1])
@@ -87,10 +87,26 @@ class DataProvider:
         return False
 
     def registerForAlert(self, chatId):
-        self.chatIdsForAlert.add(chatId)
+        cur = self.db.cursor()
+        cur.execute("INSERT IGNORE INTO registered(chatid) VALUES ({});".format(chatId))
+        db.commit()
+        cur.close()
 
     def unregisterForAlert(self, chatId):
-        self.chatIdsForAlert.remove(chatId)
+        cur = self.db.cursor()
+        cur.execute("DELETE FROM registered WHERE chatid ={};".format(chatId))
+        db.commit()
+        cur.close()
+
+    def getRegistered(self):
+        cur = self.db.cursor()
+        cur.execute("SELECT chatid FROM registered;")
+        data = set()
+        for row in cur.fetchall():
+            data.append(int(row[0]))
+        cur.close()
+        return data
+
 
 db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb")
 prov = DataProvider(db)
@@ -137,7 +153,7 @@ while 1:
         prov.lastCheck = datetime.datetime.now()
 	if prov.checkForFrost() == True and datetime.datetime.now() > prov.lastAlert + datetime.timedelta(minutes=MINUTESDELAYALERT): 
             prov.lastAlert = datetime.datetime.now()
-            for chat_id in prov.chatIdsForAlert:
+            for chat_id in prov.getRegistered():
                 bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
 
 db.close()
