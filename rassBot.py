@@ -9,6 +9,7 @@ import telepot
 TOKEN = sys.argv[1]      # get token from command-line
 MINUTESDELAYALERT = 60*6 # minutes between frost alerts
 TEMPFROSTCHECK = 2.0     # trigger temperatur for frost alert
+INTERVALFROSTCHECK = 5   # interval in minutes
 
 class DataProvider:
 
@@ -24,7 +25,7 @@ class DataProvider:
         sql = """select s.model, s.sensor_id, s.time, s.{0}
                  from sensors s
                  join (select max(id) as id from sensors where {0} is not null and sensor_id > 0 group by sensor_id) as d on s.id = d.id
-                 order by s.time desc""".format(field)
+                 order by s.model,s.sensor_id""".format(field)
         cur = self.db.cursor()
         a = cur.execute(sql)
         data = []
@@ -32,7 +33,6 @@ class DataProvider:
             data.extend("Keine Klimadaten gefunden!")
         else:
             for row in cur.fetchall():
-                print row
                 messzeit = str(row[2])
                 sensor = str(row[0])
                 id = int(row[1])
@@ -78,7 +78,6 @@ class DataProvider:
         return result 
 
     def checkForFrost(self):
-        print "Frost check at {}".format(self.lastCheck)
         data = self.getLastValues(self.tempField)
         for item in data:
             if item[3] < TEMPFROSTCHECK:
@@ -103,12 +102,13 @@ class DataProvider:
         cur.execute("SELECT chatid FROM registered;")
         data = set()
         for row in cur.fetchall():
-            data.append(int(row[0]))
+            data.add(int(row[0]))
         cur.close()
         return data
 
 
-db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb")
+db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb") 
+db.autocommit(True) 
 prov = DataProvider(db)
 
 def handle(msg):
@@ -149,7 +149,7 @@ print 'Listening ...'
 # Keep the program running.
 while 1:
     time.sleep(10)
-    if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=5):
+    if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=INTERVALFROSTCHECK):
         prov.lastCheck = datetime.datetime.now()
 	if prov.checkForFrost() == True and datetime.datetime.now() > prov.lastAlert + datetime.timedelta(minutes=MINUTESDELAYALERT): 
             prov.lastAlert = datetime.datetime.now()
