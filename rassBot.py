@@ -5,11 +5,15 @@ import time
 import datetime
 import MySQLdb
 import telepot
+import requests
+import json
 
 TOKEN = sys.argv[1]      # get token from command-line
 MINUTESDELAYALERT = 60*6 # minutes between frost alerts
 TEMPFROSTCHECK = 2.0     # trigger temperatur for frost alert
-INTERVALFROSTCHECK = 5   # interval in minutes
+INTERVALFROSTCHECK = 15   # interval in minutes
+OPENWEATHERAPIKEY = sys.argv[2]
+OPENWEATHERZIP = sys.argv[3]
 
 class DataProvider:
 
@@ -106,6 +110,12 @@ class DataProvider:
         cur.close()
         return data
 
+    def getWeatherInfo(self):
+        url = "http://api.openweathermap.org/data/2.5/weather?zip={},DE&lang=de&units=metric&APPID={}".format(OPENWEATHERZIP, OPENWEATHERAPIKEY)
+        response = requests.post(url)
+        data = json.loads(response.text)
+        print "query weather api ..."
+        return "{}\nLuftdruck: {} hPa\nWindstärke: {} m/s".format(data['weather'][0]['description'], data['main']['pressure'], data['wind']['speed'])
 
 db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb") 
 db.autocommit(True) 
@@ -126,6 +136,8 @@ def handle(msg):
             bot.sendMessage(chat_id, "Noch kein Frost da :)")
         else:
             bot.sendMessage(chat_id, "OK, jetzt ist der Frost da! Hoffentlich sind die Pflanzen drin!")
+    elif command == '/weather':
+        bot.sendMessage(chat_id, prov.getWeatherInfo())
     elif command == "/register":
         prov.registerForAlert(chat_id)
         bot.sendMessage(chat_id, "Erfolgreich registriert!")
@@ -133,7 +145,7 @@ def handle(msg):
         prov.unregisterForAlert(chat_id)
         bot.sendMessage(chat_id, "Erfolgreich abgemeldet!")
     elif command == "/help":
-        bot.sendMessage(chat_id, "/lastTemp - Liefert aktuelle Temperaturwerte\n/lastHumi - Liefert aktuelle Luftfeuchtigkeitswerte\n/lastNightTemp - Liefert die MIN/MAX Temperaturen der letzten Nacht\n/checkForFrost - Sagt alles ...\n/register - Für den Frostalarm anmelden\n/unregister - Für den Frostalarm abmelden")
+        bot.sendMessage(chat_id, "/lastTemp - Liefert aktuelle Temperaturwerte\n/lastHumi - Liefert aktuelle Luftfeuchtigkeitswerte\n/lastNightTemp - Liefert die MIN/MAX Temperaturen der letzten Nacht\n/checkForFrost - Sagt alles ...\n/register - Für den Frostalarm anmelden\n/unregister - Für den Frostalarm abmelden\n/weather - Allgemeine Wetterdaten")
     else:
         bot.sendMessage(chat_id, "Das habe ich nicht verstanden ...")
 
