@@ -8,12 +8,13 @@ import telepot
 import requests
 import json
 
-TOKEN = sys.argv[1]      # get token from command-line
-MINUTESDELAYALERT = 60*6 # minutes between frost alerts
-TEMPFROSTCHECK = 2.0     # trigger temperatur for frost alert
-INTERVALFROSTCHECK = 15   # interval in minutes
-OPENWEATHERAPIKEY = sys.argv[2]
-OPENWEATHERZIP = sys.argv[3]
+TOKEN = sys.argv[1]            # get token from command-line
+MINUTESDELAYALERT = 60*6       # minutes between frost alerts
+TEMPFROSTCHECK = 2.0           # trigger temperatur for frost alert
+INTERVALFROSTCHECK = 15        # interval in minutes for frost check
+OPENWEATHERAPIKEY = sys.argv[2]# get api key from command-line
+OPENWEATHERZIP = sys.argv[3]   # get postal code from command-line (e.g. 80000,DE)
+INTERVALOPENWEATHER = 60*2     # interval in minutes for OpenWeather check
 
 class DataProvider:
 
@@ -21,6 +22,7 @@ class DataProvider:
     humiField = "humidity_dec"
     lastAlert = datetime.datetime.now()
     lastCheck = datetime.datetime.now()
+    lastOpenWeatherCheck = None
 
     def __init__(self, db):
         self.db = db
@@ -111,11 +113,28 @@ class DataProvider:
         return data
 
     def getWeatherInfo(self):
-        url = "http://api.openweathermap.org/data/2.5/weather?zip={},DE&lang=de&units=metric&APPID={}".format(OPENWEATHERZIP, OPENWEATHERAPIKEY)
+        cur = self.db.cursor()
+        cur.execute("SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,date_created FROM open_weather ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        description = str(row[0])
+        pressure = float(row[1])
+        wind_speed = float(row[2])
+        wind_deg = float(row[3])
+        sunrise = str(row[4])
+        sunset = str(row[5])
+        date_created = str(row[6])
+        return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4} °\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
+
+    def queryOpenWeather(self):
+        url = "http://api.openweathermap.org/data/2.5/weather?zip={}&lang=de&units=metric&APPID={}".format(OPENWEATHERZIP, OPENWEATHERAPIKEY)
         response = requests.post(url)
         data = json.loads(response.text)
         print "query weather api ..."
-        return "{}\nLuftdruck: {} hPa\nWindstärke: {} m/s".format(data['weather'][0]['description'], data['main']['pressure'], data['wind']['speed'])
+        cur = self.db.cursor()
+        cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(data['weather'][0]['description'], data['main']['pressure'], data['wind']['speed'], data['wind']['deg'], data['sys']['sunrise'], data['sys']['sunset']))
+        db.commit()
+        cur.close()
+        self.lastOpenWeatherCheck = datetime.datetime.now()
 
 db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb") 
 db.autocommit(True) 
@@ -137,7 +156,7 @@ def handle(msg):
         else:
             bot.sendMessage(chat_id, "OK, jetzt ist der Frost da! Hoffentlich sind die Pflanzen drin!")
     elif command == '/weather':
-        bot.sendMessage(chat_id, prov.getWeatherInfo())
+        bot.sendMessage(chat_id, prov.getWeatherInfo() + "\n" + "\n".join(prov.getLastTemperatures()))
     elif command == "/register":
         prov.registerForAlert(chat_id)
         bot.sendMessage(chat_id, "Erfolgreich registriert!")
@@ -161,6 +180,11 @@ print 'Listening ...'
 # Keep the program running.
 while 1:
     time.sleep(10)
+    if prov.lastOpenWeatherCheck == None:
+        prov.queryOpenWeather()
+    if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(minutes=INTERVALOPENWEATHER):
+        prov.queryOpenWeather()
+
     if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=INTERVALFROSTCHECK):
         prov.lastCheck = datetime.datetime.now()
 	if prov.checkForFrost() == True and datetime.datetime.now() > prov.lastAlert + datetime.timedelta(minutes=MINUTESDELAYALERT): 
