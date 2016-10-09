@@ -8,13 +8,14 @@ import telepot
 import requests
 import json
 
-TOKEN = sys.argv[1]            # get token from command-line
-MINUTESDELAYALERT = 60*6       # minutes between frost alerts
-TEMPFROSTCHECK = 2.0           # trigger temperatur for frost alert
-INTERVALFROSTCHECK = 15        # interval in minutes for frost check
-OPENWEATHERAPIKEY = sys.argv[2]# get api key from command-line
-OPENWEATHERZIP = sys.argv[3]   # get postal code from command-line (e.g. 80000,DE)
-INTERVALOPENWEATHER = 60*2     # interval in minutes for OpenWeather check
+TOKEN = sys.argv[1]                 # get token from command-line
+MINUTESDELAYALERT = 60*6            # minutes between frost alerts
+TEMPFROSTCHECK = 2.0                # trigger temperatur for frost alert
+INTERVALFROSTCHECK = 15             # interval in minutes for frost check
+OPENWEATHERAPIKEY = sys.argv[2]     # get api key from command-line
+OPENWEATHERZIP = sys.argv[3]        # get postal code from command-line (e.g. 80000,DE)
+INTERVALOPENWEATHER = 60*2          # interval in minutes for OpenWeather check
+DATEFORMAT = "%Y-%m-%d %H:%M:%S" # dateformat
 
 class DataProvider:
 
@@ -39,7 +40,7 @@ class DataProvider:
             data.extend("Keine Klimadaten gefunden!")
         else:
             for row in cur.fetchall():
-                messzeit = str(row[2])
+                messzeit = datetime.datetime.strptime(str(row[2]), DATEFORMAT).strftime('%H:%M:%S')
                 sensor = str(row[0])
                 id = int(row[1])
                 value = float(row[3])
@@ -63,7 +64,7 @@ class DataProvider:
                 sensor = str(row[0])
                 id = int(row[1])
                 maxValue = float(row[3])
-                data.append("{0}[{1}] min: {2}{4} max: {3}{4}".format(sensor, id, minValue, maxValue, " °C"))
+                data.append("{0}[{1}]\nmin: {2}{4} max: {3}{4}".format(sensor, id, minValue, maxValue, " °C"))
         cur.close()
         return data
 
@@ -72,7 +73,7 @@ class DataProvider:
         label = " °C"
         data = self.getLastValues(self.tempField)
         for i in data:
-            result.append("{0}[{1}] {2}: {3}{4}".format(i[0], i[1], i[2], i[3], label))
+            result.append("{0}[{1}]\n{2}: {3}{4}".format(i[0], i[1], i[2], i[3], label))
         return result
 
     def getLastHumidities(self):
@@ -80,7 +81,7 @@ class DataProvider:
         label = " %"
         data = self.getLastValues(self.humiField)
         for i in data:
-            result.append("{0}[{1}] {2}: {3}{4}".format(i[0], i[1], i[2], i[3], label))
+            result.append("{0}[{1}]\n{2}: {3}{4}".format(i[0], i[1], i[2], i[3], label))
         return result 
 
     def checkForFrost(self):
@@ -116,12 +117,12 @@ class DataProvider:
         cur = self.db.cursor()
         cur.execute("SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,date_created FROM open_weather ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
-        description = str(row[0])
+        description = row[0].encode('utf-8')
         pressure = float(row[1])
         wind_speed = float(row[2])
         wind_deg = float(row[3])
-        sunrise = str(row[4])
-        sunset = str(row[5])
+        sunrise = datetime.datetime.strptime(str(row[4]), DATEFORMAT).strftime('%H:%M:%S')
+        sunset = datetime.datetime.strptime(str(row[5]), DATEFORMAT).strftime('%H:%M:%S')
         date_created = str(row[6])
         return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4} °\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
 
@@ -131,12 +132,12 @@ class DataProvider:
         data = json.loads(response.text)
         print "query weather api ..."
         cur = self.db.cursor()
-        cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(data['weather'][0]['description'], data['main']['pressure'], data['wind']['speed'], data['wind']['deg'], data['sys']['sunrise'], data['sys']['sunset']))
+        cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(data['weather'][0]['description'].encode('utf8'), data['main']['pressure'], data['wind']['speed'], data['wind']['deg'], data['sys']['sunrise'], data['sys']['sunset']))
         db.commit()
         cur.close()
         self.lastOpenWeatherCheck = datetime.datetime.now()
 
-db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb") 
+db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb", charset="utf8") 
 db.autocommit(True) 
 prov = DataProvider(db)
 
