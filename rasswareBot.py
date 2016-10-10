@@ -7,6 +7,18 @@ import MySQLdb
 import telepot
 import requests
 import json
+# https://github.com/nickoala/telepot/issues/87#issuecomment-235173302
+import telepot.api
+import urllib3
+
+telepot.api._pools = {
+    'default': urllib3.PoolManager(num_pools=3, maxsize=10, retries=3, timeout=30),
+}
+
+def force_independent_connection(req, **user_kw):
+    return None
+
+telepot.api._which_pool = force_independent_connection
 
 TOKEN = sys.argv[1]                 # get token from command-line
 MINUTESDELAYALERT = 60*6            # minutes between frost alerts
