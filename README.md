@@ -1,6 +1,6 @@
 # rasswareBot
 
-A telegram bot for weather infos based on a DVB-T USB dongle, a RaspberryPi and the software rtl_433.
+A telegram bot for weather infos based on a DVB-T USB dongle with the RealtekRTL2832U chip, a Raspberry Pi V2 and the software rtl_433.
 
 ### Compile rtl_433 on your RaspberryPi
 
