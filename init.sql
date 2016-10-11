@@ -1,6 +1,6 @@
 CREATE DATABASE climadb CHARACTER SET utf8 COLLATE utf8_general_ci;
 
-GRANT ALL PRIVILEGES ON climadb.* To 'climabot'@'localhost' IDENTIFIED BY '';
+GRANT ALL PRIVILEGES ON climadb.* To 'climabot'@'localhost' IDENTIFIED BY '<password>';
 
 CREATE TABLE sensors (
 id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,

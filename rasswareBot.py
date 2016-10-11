@@ -136,7 +136,7 @@ class DataProvider:
         sunrise = datetime.datetime.strptime(str(row[4]), DATEFORMAT).strftime('%H:%M:%S')
         sunset = datetime.datetime.strptime(str(row[5]), DATEFORMAT).strftime('%H:%M:%S')
         date_created = str(row[6])
-        return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4} °\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
+        return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4}°\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
 
     def queryOpenWeather(self):
         url = "http://api.openweathermap.org/data/2.5/weather?zip={}&lang=de&units=metric&APPID={}".format(OPENWEATHERZIP, OPENWEATHERAPIKEY)
@@ -149,9 +149,29 @@ class DataProvider:
         cur.close()
         self.lastOpenWeatherCheck = datetime.datetime.now()
 
+    def getPressureHistory(self, limit):
+        cur = self.db.cursor()
+        cur.execute("SELECT date_created,pressure FROM open_weather ORDER BY id DESC LIMIT {0}".format(limit))
+        data = []
+        for row in cur.fetchall():
+            data.append("{0}: {1} hPa".format(str(row[0]), float(row[1])))
+        cur.close
+        return data
+
 db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb", charset="utf8") 
 db.autocommit(True) 
 prov = DataProvider(db)
+errorMsg = "Das habe ich nicht verstanden ..."
+helpMsg = """
+/lastTemp - Liefert aktuelle Temperaturwerte
+/lastHumi - Liefert aktuelle Luftfeuchtigkeitswerte
+/lastNightTemp - Liefert die MIN/MAX Temperaturen der letzten Nacht
+/pressure <limit> - Liefert historische Luftdruckwerte
+/checkForFrost - Sagt alles ...
+/register - Für den Frostalarm anmelden
+/unregister - Für den Frostalarm abmelden
+/weather - Allgemeine Wetterdaten
+"""
 
 def handle(msg):
     chat_id = msg['chat']['id']
@@ -170,6 +190,13 @@ def handle(msg):
             bot.sendMessage(chat_id, "OK, jetzt ist der Frost da! Hoffentlich sind die Pflanzen drin!")
     elif command == '/weather':
         bot.sendMessage(chat_id, prov.getWeatherInfo() + "\n" + "\n".join(prov.getLastTemperatures()))
+    elif command.startswith('/pressure'):
+        args = command.split(' ',1)
+        limit = int(args[-1]) if args[-1].isdigit() else 10
+        if len(args) > 2 or limit > 100:
+            bot.sendMessage(chat_id, "Syntax: \"/pressure <limit>\"\nLimit max 100")
+        else:
+            bot.sendMessage(chat_id, "\n".join(prov.getPressureHistory(limit)))
     elif command == "/register":
         prov.registerForAlert(chat_id)
         bot.sendMessage(chat_id, "Erfolgreich registriert!")
@@ -177,9 +204,9 @@ def handle(msg):
         prov.unregisterForAlert(chat_id)
         bot.sendMessage(chat_id, "Erfolgreich abgemeldet!")
     elif command == "/help":
-        bot.sendMessage(chat_id, "/lastTemp - Liefert aktuelle Temperaturwerte\n/lastHumi - Liefert aktuelle Luftfeuchtigkeitswerte\n/lastNightTemp - Liefert die MIN/MAX Temperaturen der letzten Nacht\n/checkForFrost - Sagt alles ...\n/register - Für den Frostalarm anmelden\n/unregister - Für den Frostalarm abmelden\n/weather - Allgemeine Wetterdaten")
+        bot.sendMessage(chat_id, helpMsg)
     else:
-        bot.sendMessage(chat_id, "Das habe ich nicht verstanden ...")
+        bot.sendMessage(chat_id, errorMsg)
 
     flavor = telepot.flavor(msg)
 
