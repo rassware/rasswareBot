@@ -53,6 +53,6 @@ http://openweathermap.org/
 
 ### Start your bot
 
-python rasswareBot.py <Telegram Token from Botfather> <OpenWeatherAPI key> <postalcode>,<ISO country code>
+python rasswareBot.py \<Telegram Token from Botfather\> \<OpenWeatherAPI key\> \<postalcode\>,\<ISO country code\>
 
 All done! Have fun with your new weather bot!
