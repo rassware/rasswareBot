@@ -10,5 +10,5 @@
 rm /tmp/sensors.csv
 
 # do some transformations
-/usr/bin/mysql -uclimabot -pStart#123 -D climadb -e'UPDATE sensors SET temperature_C_dec = temperature_C WHERE temperature_C <> "" AND temperature_C_dec IS NULL;'
-/usr/bin/mysql -uclimabot -pStart#123 -D climadb -e'UPDATE sensors SET humidity_dec = humidity WHERE humidity <> "" AND humidity_dec IS NULL;'
+/usr/bin/mysql -u<user> -p<password> -D climadb -e'UPDATE sensors SET temperature_C_dec = temperature_C WHERE temperature_C <> "" AND temperature_C_dec IS NULL;'
+/usr/bin/mysql -u<user> -p<password> -D climadb -e'UPDATE sensors SET humidity_dec = humidity WHERE humidity <> "" AND humidity_dec IS NULL;'
