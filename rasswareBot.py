@@ -7,6 +7,9 @@ import MySQLdb
 import telepot
 import requests
 import json
+import plotly.plotly as py
+import plotly.graph_objs as go
+from random import randint
 # https://github.com/nickoala/telepot/issues/87#issuecomment-235173302
 import telepot.api
 import urllib3
@@ -152,9 +155,7 @@ class DataProvider:
     def getPressureHistory(self, limit):
         cur = self.db.cursor()
         cur.execute("SELECT date_created,pressure FROM open_weather ORDER BY id DESC LIMIT {0}".format(limit))
-        data = []
-        for row in cur.fetchall():
-            data.append("{0}: {1} hPa".format(str(row[0]), float(row[1])))
+        data = cur.fetchall()
         cur.close
         return data
 
@@ -167,6 +168,7 @@ helpMsg = """
 /lastHumi - Liefert aktuelle Luftfeuchtigkeitswerte
 /lastNightTemp - Liefert die MIN/MAX Temperaturen der letzten Nacht
 /pressure <limit> - Liefert historische Luftdruckwerte
+/graph <limit> - Zeichnet ein Luftdruckdiagramm
 /checkForFrost - Sagt alles ...
 /register - Für den Frostalarm anmelden
 /unregister - Für den Frostalarm abmelden
@@ -196,7 +198,26 @@ def handle(msg):
         if len(args) > 2 or limit > 100:
             bot.sendMessage(chat_id, "Syntax: \"/pressure <limit>\"\nLimit max 100")
         else:
-            bot.sendMessage(chat_id, "\n".join(prov.getPressureHistory(limit)))
+            result = []
+            data = prov.getPressureHistory(limit)
+            for row in data:
+                result.append("{0}: {1} hPa".format(str(row[0]), float(row[1])))
+            bot.sendMessage(chat_id, "\n".join(result))
+    elif command.startswith('/graph'):
+        args = command.split(' ',1)
+        limit = int(args[-1]) if args[-1].isdigit() else 10
+        if len(args) > 2 or limit > 100:
+            bot.sendMessage(chat_id, "Syntax: \"/pressuregraph <limit>\"\nLimit max 100")
+        else:
+            x = []
+            y = []
+            data = prov.getPressureHistory(limit)
+            for row in data:
+                x.append(str(row[0]))
+                y.append(float(row[1]))
+            chartdata = [go.Scatter(x=x, y=y)]
+            url = py.plot(chartdata, filename = 'pressure') + ".png?v=" + str(randint(0,25000))
+            bot.sendPhoto(chat_id, url)
     elif command == "/register":
         prov.registerForAlert(chat_id)
         bot.sendMessage(chat_id, "Erfolgreich registriert!")

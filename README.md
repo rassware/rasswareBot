@@ -51,6 +51,11 @@ https://core.telegram.org/bots#3-how-do-i-create-a-bot
 
 http://openweathermap.org/
 
+### Get an API key from plot.ly (Free service)
+
+https://plot.ly/
+Follow the instructions on the page to get an API key
+
 ### Start your bot
 
 python rasswareBot.py \<Telegram Token from Botfather\> \<OpenWeatherAPI key\> \<postalcode\>,\<ISO country code\>
