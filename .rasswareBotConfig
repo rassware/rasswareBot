@@ -1,0 +1,27 @@
+# Config file for rasswareBot.py
+
+[Database]
+user: <user>
+pw: <password>
+db: <database>
+host: <host>
+
+[Telegram]
+token: <token>
+
+[OpenWeatherMap]
+key: <api key>
+zip: <postal code>
+interval: <interval in minutes>
+user: <user>
+pw: <password>
+lat: <latidude>
+lng: <longitude>
+alt: <altidude>
+name: <weather station name>
+
+[rasswareBot]
+frostcheckinterval: <minutes between frost checks>
+frostalertdelay: <minutes between frost alerts>
+frosttriggertemp: <trigger temperatur for frost alert>
+dateformat: "%Y-%m-%d %H:%M:%S"

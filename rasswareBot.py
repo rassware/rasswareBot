@@ -10,6 +10,8 @@ import json
 import plotly.plotly as py
 import plotly.graph_objs as go
 from random import randint
+import ConfigParser
+from os.path import expanduser
 # https://github.com/nickoala/telepot/issues/87#issuecomment-235173302
 import telepot.api
 import urllib3
@@ -23,14 +25,11 @@ def force_independent_connection(req, **user_kw):
 
 telepot.api._which_pool = force_independent_connection
 
-TOKEN = sys.argv[1]                 # get token from command-line
-MINUTESDELAYALERT = 60*6            # minutes between frost alerts
-TEMPFROSTCHECK = 2.0                # trigger temperatur for frost alert
-INTERVALFROSTCHECK = 15             # interval in minutes for frost check
-OPENWEATHERAPIKEY = sys.argv[2]     # get api key from command-line
-OPENWEATHERZIP = sys.argv[3]        # get postal code from command-line (e.g. 80000,DE)
-INTERVALOPENWEATHER = 60*2          # interval in minutes for OpenWeather check
-DATEFORMAT = "%Y-%m-%d %H:%M:%S" # dateformat
+config = ConfigParser.ConfigParser()
+home = expanduser("~")
+config.read(home + "/.rasswareBotConfig")
+
+DATEFORMAT = config.get('rasswareBot', 'dateformat', 1)
 
 class DataProvider:
 
@@ -102,7 +101,7 @@ class DataProvider:
     def checkForFrost(self):
         data = self.getLastValues(self.tempField)
         for item in data:
-            if item[3] < TEMPFROSTCHECK:
+            if item[3] < float(config.get('rasswareBot', 'frostcheckinterval')):
                 print "Frost da! {} °C".format(item[3])
                 return True
         return False
@@ -142,7 +141,7 @@ class DataProvider:
         return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4}°\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
 
     def queryOpenWeather(self):
-        url = "http://api.openweathermap.org/data/2.5/weather?zip={}&lang=de&units=metric&APPID={}".format(OPENWEATHERZIP, OPENWEATHERAPIKEY)
+        url = "http://api.openweathermap.org/data/2.5/weather?zip={}&lang=de&units=metric&APPID={}".format(config.get('OpenWeatherMap', 'zip', 1), config.get('OpenWeatherMap', 'key', 1))
         response = requests.post(url)
         data = json.loads(response.text)
         print "query weather api ..."
@@ -152,6 +151,25 @@ class DataProvider:
         cur.close()
         self.lastOpenWeatherCheck = datetime.datetime.now()
 
+    def sendOpenWeather(self):
+        cur = self.db.cursor()
+        cur.execute("SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        row = cur.fetchone()
+        temp = row[0]
+        cur.execute("SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        row = cur.fetchone()
+        humi = row[0]
+        cur.close()
+        lat = config.get('OpenWeatherMap', 'lat')
+        lng = config.get('OpenWeatherMap', 'lng')
+        alt = config.get('OpenWeatherMap', 'alt')
+        name = config.get('OpenWeatherMap', 'name', 1)
+        user = config.get('OpenWeatherMap', 'user', 1)
+        pw = config.get('OpenWeatherMap', 'pw', 1)
+        data = {'temp': temp, 'humidity': humi, 'lat': lat, 'long': lng, 'alt': alt, 'name': name}
+        response = requests.post('http://openweathermap.org/data/post', data, auth=(user, pw))
+        print "send data to OpenWeather API: " + response.text
+
     def getPressureHistory(self, limit):
         cur = self.db.cursor()
         cur.execute("SELECT date_created,pressure FROM open_weather ORDER BY id DESC LIMIT {0}".format(limit))
@@ -159,7 +177,7 @@ class DataProvider:
         cur.close
         return data
 
-db = MySQLdb.connect(host="localhost", user="climabot", passwd="Start#123", db="climadb", charset="utf8") 
+db = MySQLdb.connect(host=config.get('Database', 'host', 1), user=config.get('Database', 'user', 1), passwd=config.get('Database', 'pw', 1), db=config.get('Database', 'db', 1), charset="utf8") 
 db.autocommit(True) 
 prov = DataProvider(db)
 errorMsg = "Das habe ich nicht verstanden ..."
@@ -234,7 +252,7 @@ def handle(msg):
     summary = telepot.glance(msg, flavor=flavor)
     print flavor, summary
 
-bot = telepot.Bot(TOKEN)
+bot = telepot.Bot(config.get('Telegram','token', 0))
 bot.message_loop(handle)
 print 'Listening ...'
 
@@ -243,16 +261,16 @@ while 1:
     time.sleep(10)
     if prov.lastOpenWeatherCheck == None:
         prov.queryOpenWeather()
-    if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(minutes=INTERVALOPENWEATHER):
+#        prov.sendOpenWeather()
+    if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(minutes=int(config.get('OpenWeatherMap', 'interval'))):
         prov.queryOpenWeather()
+#        prov.sendOpenWeather()
 
-    if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=INTERVALFROSTCHECK):
+    if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay'))):
         prov.lastCheck = datetime.datetime.now()
-	if prov.checkForFrost() == True and datetime.datetime.now() > prov.lastAlert + datetime.timedelta(minutes=MINUTESDELAYALERT): 
+	if prov.checkForFrost() == True and datetime.datetime.now() > prov.lastAlert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay'))): 
             prov.lastAlert = datetime.datetime.now()
             for chat_id in prov.getRegistered():
                 bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
 
 db.close()
-
-
