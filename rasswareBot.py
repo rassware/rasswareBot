@@ -101,7 +101,7 @@ class DataProvider:
     def checkForFrost(self):
         data = self.getLastValues(self.tempField)
         for item in data:
-            if item[3] < float(config.get('rasswareBot', 'frostcheckinterval')):
+            if item[3] < float(config.get('rasswareBot', 'frosttriggertemp')):
                 print "Frost da! {} °C".format(item[3])
                 return True
         return False
@@ -266,7 +266,7 @@ while 1:
         prov.queryOpenWeather()
 #        prov.sendOpenWeather()
 
-    if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay'))):
+    if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostcheckinterval'))):
         prov.lastCheck = datetime.datetime.now()
 	if prov.checkForFrost() == True and datetime.datetime.now() > prov.lastAlert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay'))): 
             prov.lastAlert = datetime.datetime.now()
