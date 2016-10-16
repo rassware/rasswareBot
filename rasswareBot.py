@@ -143,12 +143,15 @@ class DataProvider:
     def queryOpenWeather(self):
         url = "http://api.openweathermap.org/data/2.5/weather?zip={}&lang=de&units=metric&APPID={}".format(config.get('OpenWeatherMap', 'zip', 1), config.get('OpenWeatherMap', 'key', 1))
         response = requests.post(url)
-        data = json.loads(response.text)
-        print "query weather api ..."
-        cur = self.db.cursor()
-        cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(data['weather'][0]['description'].encode('utf8'), data['main']['pressure'], data['wind']['speed'], data['wind']['deg'], data['sys']['sunrise'], data['sys']['sunset']))
-        db.commit()
-        cur.close()
+        print "Query OpenWeather API ..."
+        try:
+            data = json.loads(response.text)
+            cur = self.db.cursor()
+            cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(data['weather'][0]['description'].encode('utf8'), data['main']['pressure'], data['wind']['speed'], data['wind']['deg'], data['sys']['sunrise'], data['sys']['sunset']))
+            db.commit()
+            cur.close()
+        except ValueError:
+            print "Could not query OpenWeater API"
         self.lastOpenWeatherCheck = datetime.datetime.now()
 
     def sendOpenWeather(self):
