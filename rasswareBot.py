@@ -35,7 +35,6 @@ class DataProvider:
 
     tempField = "temperature_C_dec"
     humiField = "humidity_dec"
-    lastAlert = datetime.datetime.now()
     lastCheck = datetime.datetime.now()
     lastOpenWeatherCheck = None
 
@@ -98,32 +97,39 @@ class DataProvider:
             result.append("{0}[{1}]\n{2}: {3}{4}".format(i[0], i[1], i[2], i[3], label))
         return result 
 
-    def checkForFrost(self):
+    def checkForFrost(self, sensor_id):
         data = self.getLastValues(self.tempField)
         for item in data:
-            if item[3] < float(config.get('rasswareBot', 'frosttriggertemp')):
-                print "Frost da! {} °C".format(item[3])
+            if item[3] < float(config.get('rasswareBot', 'frosttriggertemp')) and str(sensor_id) == str(item[1]):
+                print "Frost da! {0} °C, gemessen von sensor_id {1}".format(item[3], item[1])
                 return True
         return False
 
-    def registerForAlert(self, chatId):
+    def registerForAlert(self, chatId, sensor_id):
         cur = self.db.cursor()
-        cur.execute("INSERT IGNORE INTO registered(chatid) VALUES ({});".format(chatId))
+        cur.execute("INSERT IGNORE INTO registered(chatid, sensor_id) VALUES ({0}, {1});".format(chatId, sensor_id))
         db.commit()
         cur.close()
 
-    def unregisterForAlert(self, chatId):
+    def unregisterForAlert(self, chatId, sensor_id):
         cur = self.db.cursor()
-        cur.execute("DELETE FROM registered WHERE chatid ={};".format(chatId))
+        cur.execute("DELETE FROM registered WHERE chatid = {0} and sensor_id = {1};".format(chatId, sensor_id))
+        db.commit()
+        cur.close()
+
+    def updateLastAlert(self, chatId, sensor_id, last_alert):
+        cur = self.db.cursor()
+        cur.execute("UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert, chatId, sensor_id))
         db.commit()
         cur.close()
 
     def getRegistered(self):
         cur = self.db.cursor()
-        cur.execute("SELECT chatid FROM registered;")
-        data = set()
+        cur.execute("SELECT chatid, sensor_id, last_alert FROM registered;")
+        data = []
         for row in cur.fetchall():
-            data.add(int(row[0]))
+            last_alert = datetime.datetime.strptime(str(row[2]), DATEFORMAT) if row[2] != None else None
+            data.append([int(row[0]), row[1], last_alert])
         cur.close()
         return data
 
@@ -190,9 +196,8 @@ helpMsg = """
 /lastNightTemp - Liefert die MIN/MAX Temperaturen der letzten Nacht
 /pressure <limit> - Liefert historische Luftdruckwerte
 /graph <limit> - Zeichnet ein Luftdruckdiagramm
-/checkForFrost - Sagt alles ...
-/register - Für den Frostalarm anmelden
-/unregister - Für den Frostalarm abmelden
+/register <sensor_id> - Für den Frostalarm anmelden
+/unregister <sensor_id> - Für den Frostalarm abmelden
 /weather - Allgemeine Wetterdaten
 """
 
@@ -206,11 +211,6 @@ def handle(msg):
         bot.sendMessage(chat_id, "\n".join(prov.getLastHumidities()))
     elif command == '/lastNightTemp':
         bot.sendMessage(chat_id, "\n".join(prov.getLastNightTemperatures()))
-    elif command == '/checkForFrost':
-        if prov.checkForFrost() == False:
-            bot.sendMessage(chat_id, "Noch kein Frost da :)")
-        else:
-            bot.sendMessage(chat_id, "OK, jetzt ist der Frost da! Hoffentlich sind die Pflanzen drin!")
     elif command == '/weather':
         bot.sendMessage(chat_id, prov.getWeatherInfo() + "\n" + "\n".join(prov.getLastTemperatures()))
     elif command.startswith('/pressure'):
@@ -239,12 +239,22 @@ def handle(msg):
             chartdata = [go.Scatter(x=x, y=y)]
             url = py.plot(chartdata, filename = 'pressure') + ".png?v=" + str(randint(0,25000))
             bot.sendPhoto(chat_id, url)
-    elif command == "/register":
-        prov.registerForAlert(chat_id)
-        bot.sendMessage(chat_id, "Erfolgreich registriert!")
-    elif command == "/unregister":
-        prov.unregisterForAlert(chat_id)
-        bot.sendMessage(chat_id, "Erfolgreich abgemeldet!")
+    elif command.startswith('/register'):
+        args = command.split(' ',1)
+        sensor_id = str(args[-1])
+        if len(args) > 2 or sensor_id.isdigit() == False:
+            bot.sendMessage(chat_id, "Syntax: \"/register <sensor_id>\"")
+        else:
+            prov.registerForAlert(chat_id, sensor_id)
+            bot.sendMessage(chat_id, "Erfolgreich registriert!")
+    elif command.startswith('/unregister'):
+        args = command.split(' ',1)
+        sensor_id = str(args[-1])
+        if len(args) > 2 or sensor_id.isdigit() == False:
+            bot.sendMessage(chat_id, "Syntax: \"/unregister <sensor_id>\"")
+        else:
+            prov.unregisterForAlert(chat_id, sensor_id)
+            bot.sendMessage(chat_id, "Erfolgreich abgemeldet!")
     elif command == "/help":
         bot.sendMessage(chat_id, helpMsg)
     else:
@@ -271,9 +281,12 @@ while 1:
 
     if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostcheckinterval'))):
         prov.lastCheck = datetime.datetime.now()
-	if prov.checkForFrost() == True and datetime.datetime.now() > prov.lastAlert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay'))): 
-            prov.lastAlert = datetime.datetime.now()
-            for chat_id in prov.getRegistered():
+        for registered in prov.getRegistered():
+            chat_id = registered[0]
+            sensor_id = registered[1]
+            last_alert = registered[2]
+	    if prov.checkForFrost(sensor_id) == True and (last_alert == None or datetime.datetime.now() > last_alert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay')))): 
+                prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now())
                 bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
 
 db.close()

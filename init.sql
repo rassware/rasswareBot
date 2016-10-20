@@ -89,8 +89,10 @@ date_created TIMESTAMP DEFAULT NOW()
 CREATE TABLE registered(
 id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
 chatid BIGINT NOT NULL,
+sensor_id VARCHAR(10) NOT NULL,
+last_alert DATETIME NULL,
 date_created TIMESTAMP DEFAULT NOW(),
-UNIQUE KEY `idx_chatid` (chatid)
+UNIQUE KEY `idx_chatid` (chatid, sensor_id)
 );
 
 CREATE TABLE open_weather (
