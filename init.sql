@@ -98,9 +98,9 @@ UNIQUE KEY `idx_chatid` (chatid, sensor_id)
 CREATE TABLE open_weather (
 id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
 description VARCHAR(250),
-pressure DECIMAL(7,4),
-wind_speed DECIMAL(7,4),
-wind_deg DECIMAL(7,4),
+pressure DECIMAL(10,4),
+wind_speed DECIMAL(10,4),
+wind_deg DECIMAL(10,4),
 sunrise DATETIME,
 sunset DATETIME,
 date_created TIMESTAMP DEFAULT NOW()
