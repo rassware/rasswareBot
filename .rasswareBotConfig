@@ -25,3 +25,9 @@ frostcheckinterval: <minutes between frost checks>
 frostalertdelay: <minutes between frost alerts>
 frosttriggertemp: <trigger temperatur for frost alert>
 dateformat: "%Y-%m-%d %H:%M:%S"
+
+[WetterArchiv]
+id: <id>
+pwd: <pwd>
+sid: <sid>
+
