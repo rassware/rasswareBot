@@ -44,7 +44,7 @@ class DataProvider:
     def getLastValues(self,field):
         sql = """select s.model, s.sensor_id, s.time, s.{0}
                  from sensors s
-                 join (select max(id) as id from sensors where {0} is not null and sensor_id > 0 group by sensor_id) as d on s.id = d.id
+                 join (select max(id) as id from sensors where {0} is not null and sensor_id > 0 and time > DATE_SUB(CURDATE(), INTERVAL 6 HOUR) group by sensor_id) as d on s.id = d.id
                  order by s.model,s.sensor_id""".format(field)
         cur = self.db.cursor()
         a = cur.execute(sql)
@@ -153,7 +153,13 @@ class DataProvider:
         try:
             data = json.loads(response.text)
             cur = self.db.cursor()
-            cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(data['weather'][0]['description'].encode('utf8'), data['main']['pressure'], data['wind']['speed'], data['wind']['deg'], data['sys']['sunrise'], data['sys']['sunset']))
+            description = data['weather'][0].get('description', 'no data').encode('utf8')
+            pressure = data['main'].get('pressure', 0)
+            wind_speed =  data['wind'].get('speed', 0)
+            wind_deg = data['wind'].get('deg', 0)
+            sunrise = data['sys'].get('sunrise', datetime.datetime.now())
+            sunset = data['sys'].get('sunset', datetime.datetime.now())
+            cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(description, pressure, wind_speed, wind_deg, sunrise, sunset))
             db.commit()
             cur.close()
         except ValueError:
@@ -178,6 +184,23 @@ class DataProvider:
         data = {'temp': temp, 'humidity': humi, 'lat': lat, 'long': lng, 'alt': alt, 'name': name}
         response = requests.post('http://openweathermap.org/data/post', data, auth=(user, pw))
         print "send data to OpenWeather API: " + response.text
+
+    def sendWetterArchiv(self):
+        cur = self.db.cursor()
+        cur.execute("SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        row = cur.fetchone()
+        temp = row[0]
+        cur.execute("SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        row = cur.fetchone()
+        humi = row[0]
+        cur.close()
+        id = config.get('WetterArchiv', 'id')
+        pwd = config.get('WetterArchiv', 'pwd')
+        sid = config.get('WetterArchiv', 'sid')
+        dtutc = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        data = {'id': id, 'pwd': pwd, 'sid': sid, 'dtutc': dtutc, 'te': temp, 'hu': humi}
+        response = requests.get('http://interface.wetterarchiv.de/weather', params=data)
+        print "send data to WetterArchiv API: " + response.text
 
     def getPressureHistory(self, limit):
         cur = self.db.cursor()
@@ -271,22 +294,27 @@ print 'Listening ...'
 
 # Keep the program running.
 while 1:
-    time.sleep(10)
-    if prov.lastOpenWeatherCheck == None:
-        prov.queryOpenWeather()
-#        prov.sendOpenWeather()
-    if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(minutes=int(config.get('OpenWeatherMap', 'interval'))):
-        prov.queryOpenWeather()
-#        prov.sendOpenWeather()
+    try:
+        time.sleep(10)
+        if prov.lastOpenWeatherCheck == None:
+            prov.queryOpenWeather()
+#            prov.sendOpenWeather()
+            prov.sendWetterArchiv()
+        if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(minutes=int(config.get('OpenWeatherMap', 'interval'))):
+            prov.queryOpenWeather()
+#            prov.sendOpenWeather()
+            prov.sendWetterArchiv()
 
-    if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostcheckinterval'))):
-        prov.lastCheck = datetime.datetime.now()
-        for registered in prov.getRegistered():
-            chat_id = registered[0]
-            sensor_id = registered[1]
-            last_alert = registered[2]
-	    if prov.checkForFrost(sensor_id) == True and (last_alert == None or datetime.datetime.now() > last_alert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay')))): 
-                prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now())
-                bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
-
+        if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostcheckinterval'))):
+            prov.lastCheck = datetime.datetime.now()
+            for registered in prov.getRegistered():
+                chat_id = registered[0]
+                sensor_id = registered[1]
+                last_alert = registered[2]
+	        if prov.checkForFrost(sensor_id) == True and (last_alert == None or datetime.datetime.now() > last_alert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay')))): 
+                    prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now())
+                    bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
+    except Exception as e:
+        print e.__doc__
+        print e.message
 db.close()
