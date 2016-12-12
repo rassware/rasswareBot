@@ -11,7 +11,7 @@ token: <token>
 
 [OpenWeatherMap]
 key: <api key>
-zip: <postal code>
+cityid: <city id>
 interval: <interval in minutes>
 user: <user>
 pw: <password>

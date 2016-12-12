@@ -147,7 +147,8 @@ class DataProvider:
         return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4}°\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
 
     def queryOpenWeather(self):
-        url = "http://api.openweathermap.org/data/2.5/weather?zip={}&lang=de&units=metric&APPID={}".format(config.get('OpenWeatherMap', 'zip', 1), config.get('OpenWeatherMap', 'key', 1))
+        self.lastOpenWeatherCheck = datetime.datetime.now()
+        url = "http://api.openweathermap.org/data/2.5/weather?id={}&lang=de&units=metric&APPID={}".format(config.get('OpenWeatherMap', 'cityid', 1), config.get('OpenWeatherMap', 'key', 1))
         response = requests.post(url)
         print "Query OpenWeather API ..."
         try:
@@ -164,7 +165,6 @@ class DataProvider:
             cur.close()
         except ValueError:
             print "Could not query OpenWeater API"
-        self.lastOpenWeatherCheck = datetime.datetime.now()
 
     def sendOpenWeather(self):
         cur = self.db.cursor()
@@ -298,11 +298,11 @@ while 1:
         time.sleep(10)
         if prov.lastOpenWeatherCheck == None:
             prov.queryOpenWeather()
-#            prov.sendOpenWeather()
+            prov.sendOpenWeather()
             prov.sendWetterArchiv()
         if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(minutes=int(config.get('OpenWeatherMap', 'interval'))):
             prov.queryOpenWeather()
-#            prov.sendOpenWeather()
+            prov.sendOpenWeather()
             prov.sendWetterArchiv()
 
         if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostcheckinterval'))):
