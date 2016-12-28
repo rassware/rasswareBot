@@ -106,3 +106,6 @@ sunset DATETIME,
 date_created TIMESTAMP DEFAULT NOW()
 );
 
+CREATE INDEX model_idx ON sensors ( sensor_id,model );
+CREATE INDEX date_created_idx ON sensors ( date_created );
+

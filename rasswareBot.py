@@ -209,6 +209,36 @@ class DataProvider:
         cur.close
         return data
 
+    def getSensors(self):
+	result = []
+	cur = self.db.cursor()
+	cur.execute("SELECT sensor_id, model FROM sensors where model <> '' and date_created > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 week) and (temperature_C_dec is not null or humidity_dec is not null) GROUP BY sensor_id ORDER BY model")
+	for row in cur.fetchall():
+	    if row[0]:
+                result.append("/data_{1}_3 - {0}".format(row[1], row[0]))	    
+	cur.close
+	return result
+
+    def getSensorData(self, sensorid, limit):
+	temps = []
+        cur = self.db.cursor()
+	cur.execute("SELECT time, temperature_C_dec FROM sensors where sensor_id = {0} AND temperature_C_dec IS NOT NULL ORDER BY date_created DESC limit {1}".format(sensorid, limit))
+	for row in cur.fetchall():
+	    temps.append("{0}: {1} °C".format(row[0], row[1]))
+	cur.close
+	humis = []
+	cur = self.db.cursor()
+        cur.execute("SELECT time, humidity_dec FROM sensors where sensor_id = {0} AND humidity_dec IS NOT NULL ORDER BY date_created DESC limit {1}".format(sensorid, limit))
+	for row in cur.fetchall():
+	    humis.append("{0}: {1} %".format(row[0], row[1]))
+	cur.close
+	result = []
+	result.append("Temperatur:")
+	result.extend(temps)
+	result.append("Luftfeuchte:")
+	result.extend(humis)
+	return result
+
 db = MySQLdb.connect(host=config.get('Database', 'host', 1), user=config.get('Database', 'user', 1), passwd=config.get('Database', 'pw', 1), db=config.get('Database', 'db', 1), charset="utf8") 
 db.autocommit(True) 
 prov = DataProvider(db)
@@ -218,7 +248,9 @@ helpMsg = """
 /lastHumi - Liefert aktuelle Luftfeuchtigkeitswerte
 /lastNightTemp - Liefert die MIN/MAX Temperaturen der letzten Nacht
 /pressure <limit> - Liefert historische Luftdruckwerte
-/graph <limit> - Zeichnet ein Luftdruckdiagramm
+/graph_<limit> - Zeichnet ein Luftdruckdiagramm
+/sensors - Liefert die Ids der Sensoren
+/data <sensorid> <limit> - Liefert Daten für einen Sensor
 /register <sensor_id> - Für den Frostalarm anmelden
 /unregister <sensor_id> - Für den Frostalarm abmelden
 /weather - Allgemeine Wetterdaten
@@ -248,10 +280,10 @@ def handle(msg):
                 result.append("{0}: {1} hPa".format(str(row[0]), float(row[1])))
             bot.sendMessage(chat_id, "\n".join(result))
     elif command.startswith('/graph'):
-        args = command.split(' ',1)
+        args = command.split('_',1)
         limit = int(args[-1]) if args[-1].isdigit() else 10
         if len(args) > 2 or limit > 100:
-            bot.sendMessage(chat_id, "Syntax: \"/pressuregraph <limit>\"\nLimit max 100")
+            bot.sendMessage(chat_id, "Syntax: \"/graph_<limit>\"\nLimit max 100")
         else:
             x = []
             y = []
@@ -278,6 +310,16 @@ def handle(msg):
         else:
             prov.unregisterForAlert(chat_id, sensor_id)
             bot.sendMessage(chat_id, "Erfolgreich abgemeldet!")
+    elif command == "/sensors":
+        bot.sendMessage(chat_id, "\n".join(prov.getSensors()))
+    elif command.startswith('/data'):
+	args = command.split('_',2)
+	sensorid = str(args[1])
+        limit = int(args[-1]) if args[-1].isdigit() else 3
+        if len(args) > 3 or limit > 100 or not sensorid:
+            bot.sendMessage(chat_id, "Syntax: \"/data_<sensorid>_<limit>\"\nLimit max 100")
+        else:
+	    bot.sendMessage(chat_id, "\n".join(prov.getSensorData(sensorid, limit)))
     elif command == "/help":
         bot.sendMessage(chat_id, helpMsg)
     else:
