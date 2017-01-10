@@ -1,10 +1,7 @@
 # Config file for rasswareBot.py
 
 [Database]
-user: <user>
-pw: <password>
-db: <database>
-host: <host>
+path: <path to sqlite database>
 
 [Telegram]
 token: <token>

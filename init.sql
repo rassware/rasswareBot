@@ -1,9 +1,5 @@
-CREATE DATABASE climadb CHARACTER SET utf8 COLLATE utf8_general_ci;
-
-GRANT ALL PRIVILEGES ON climadb.* To 'climabot'@'localhost' IDENTIFIED BY '<password>';
-
 CREATE TABLE sensors (
-id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 time DATETIME,
 model VARCHAR(250),
 sensor_id VARCHAR(10),
@@ -87,7 +83,7 @@ date_created TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE registered(
-id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 chatid BIGINT NOT NULL,
 sensor_id VARCHAR(10) NOT NULL,
 last_alert DATETIME NULL,
@@ -95,8 +91,8 @@ date_created TIMESTAMP DEFAULT NOW(),
 UNIQUE KEY `idx_chatid` (chatid, sensor_id)
 );
 
-CREATE TABLE open_weather (
-id BIGINT NOT NULL PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE open_weather(
+id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 description VARCHAR(250),
 pressure DECIMAL(10,4),
 wind_speed DECIMAL(10,4),
@@ -108,4 +104,6 @@ date_created TIMESTAMP DEFAULT NOW()
 
 CREATE INDEX model_idx ON sensors ( sensor_id,model );
 CREATE INDEX date_created_idx ON sensors ( date_created );
-
+CREATE INDEX "idx_sensor_id" ON "sensors" (sensor_id);
+CREATE INDEX "idx_sensors_time" ON "sensors" (time);
+CREATE INDEX "idx_sensor_id_time" ON "sensors" (sensor_id,time);

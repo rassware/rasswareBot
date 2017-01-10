@@ -3,7 +3,7 @@
 import sys
 import time
 import datetime
-import MySQLdb
+import sqlite3
 import telepot
 import requests
 import json
@@ -30,6 +30,7 @@ home = expanduser("~")
 config.read(home + "/.rasswareBotConfig")
 
 DATEFORMAT = config.get('rasswareBot', 'dateformat', 1)
+DATABASE = config.get('Database', 'path', 1)
 
 class DataProvider:
 
@@ -38,15 +39,10 @@ class DataProvider:
     lastCheck = datetime.datetime.now()
     lastOpenWeatherCheck = None
 
-    def __init__(self, db):
-        self.db = db
-
     def getLastValues(self,field):
-        sql = """select s.model, s.sensor_id, s.time, s.{0}
-                 from sensors s
-                 join (select max(id) as id from sensors where {0} is not null and sensor_id > 0 and time > DATE_SUB(CURDATE(), INTERVAL 6 HOUR) group by sensor_id) as d on s.id = d.id
-                 order by s.model,s.sensor_id""".format(field)
-        cur = self.db.cursor()
+        sql = "select model, sensor_id, time, {0} from sensors where id in (select max(id) from sensors group by sensor_id) and time > datetime('now', '-6 hour') and {0} is not null and sensor_id > 0;".format(field)
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         a = cur.execute(sql)
         data = []
         if a == 0:
@@ -58,7 +54,7 @@ class DataProvider:
                 id = int(row[1])
                 value = float(row[3])
                 data.append([sensor, id, messzeit, value])
-        cur.close()
+        con.close()
         return data
 
     def getLastNightTemperatures(self):
@@ -66,7 +62,8 @@ class DataProvider:
                  time between subdate(concat(cast(date(current_timestamp()) as char),' 06:00:00.0'), interval 12 hour) and concat(cast(date(current_timestamp()) as char),' 06:00:00.0') and
                  temperature_C_dec is not null and sensor_id > 0
                  group by model, sensor_id"""
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         a = cur.execute(sql)
         data = []
         if a == 0:
@@ -78,7 +75,7 @@ class DataProvider:
                 id = int(row[1])
                 maxValue = float(row[3])
                 data.append("{0}[{1}]\nmin: {2}{4} max: {3}{4}".format(sensor, id, minValue, maxValue, " °C"))
-        cur.close()
+        con.close()
         return data
 
     def getLastTemperatures(self):
@@ -106,35 +103,40 @@ class DataProvider:
         return False
 
     def registerForAlert(self, chatId, sensor_id):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("INSERT IGNORE INTO registered(chatid, sensor_id) VALUES ({0}, {1});".format(chatId, sensor_id))
-        db.commit()
-        cur.close()
+        con.commit()
+        con.close()
 
     def unregisterForAlert(self, chatId, sensor_id):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("DELETE FROM registered WHERE chatid = {0} and sensor_id = {1};".format(chatId, sensor_id))
-        db.commit()
-        cur.close()
+        con.commit()
+        con.close()
 
     def updateLastAlert(self, chatId, sensor_id, last_alert):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert, chatId, sensor_id))
-        db.commit()
-        cur.close()
+        con.commit()
+        con.close()
 
     def getRegistered(self):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("SELECT chatid, sensor_id, last_alert FROM registered;")
         data = []
         for row in cur.fetchall():
             last_alert = datetime.datetime.strptime(str(row[2]), DATEFORMAT) if row[2] != None else None
             data.append([int(row[0]), row[1], last_alert])
-        cur.close()
+        con.close()
         return data
 
     def getWeatherInfo(self):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,date_created FROM open_weather ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         description = row[0].encode('utf-8')
@@ -144,6 +146,7 @@ class DataProvider:
         sunrise = datetime.datetime.strptime(str(row[4]), DATEFORMAT).strftime('%H:%M:%S')
         sunset = datetime.datetime.strptime(str(row[5]), DATEFORMAT).strftime('%H:%M:%S')
         date_created = str(row[6])
+        con.close()
         return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4}°\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
 
     def queryOpenWeather(self):
@@ -153,28 +156,30 @@ class DataProvider:
         print "Query OpenWeather API ..."
         try:
             data = json.loads(response.text)
-            cur = self.db.cursor()
+            con = sqlite3.connect(DATABASE)
+            cur = con.cursor()
             description = data['weather'][0].get('description', 'no data').encode('utf8')
             pressure = data['main'].get('pressure', 0)
             wind_speed =  data['wind'].get('speed', 0)
             wind_deg = data['wind'].get('deg', 0)
             sunrise = data['sys'].get('sunrise', datetime.datetime.now())
             sunset = data['sys'].get('sunset', datetime.datetime.now())
-            cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},FROM_UNIXTIME({4}),FROM_UNIXTIME({5}))".format(description, pressure, wind_speed, wind_deg, sunrise, sunset))
-            db.commit()
-            cur.close()
+            cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},datetime({4},'unixepoch','localtime'),datetime({5},'unixepoch','localtime'))".format(description, pressure, wind_speed, wind_deg, sunrise, sunset))
+            con.commit()
+            con.close()
         except ValueError:
             print "Could not query OpenWeater API"
 
     def sendOpenWeather(self):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         temp = row[0]
         cur.execute("SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         humi = row[0]
-        cur.close()
+        con.close()
         lat = config.get('OpenWeatherMap', 'lat')
         lng = config.get('OpenWeatherMap', 'lng')
         alt = config.get('OpenWeatherMap', 'alt')
@@ -186,14 +191,15 @@ class DataProvider:
         print "send data to OpenWeather API: " + response.text
 
     def sendWetterArchiv(self):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         temp = row[0]
         cur.execute("SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         humi = row[0]
-        cur.close()
+        con.close()
         id = config.get('WetterArchiv', 'id')
         pwd = config.get('WetterArchiv', 'pwd')
         sid = config.get('WetterArchiv', 'sid')
@@ -203,35 +209,37 @@ class DataProvider:
         print "send data to WetterArchiv API: " + response.text
 
     def getPressureHistory(self, limit):
-        cur = self.db.cursor()
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
         cur.execute("SELECT date_created,pressure FROM open_weather ORDER BY id DESC LIMIT {0}".format(limit))
         data = cur.fetchall()
-        cur.close
+        con.close()
         return data
 
     def getSensors(self):
 	result = []
-	cur = self.db.cursor()
-	cur.execute("SELECT sensor_id, model FROM sensors where model <> '' and date_created > DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 week) and (temperature_C_dec is not null or humidity_dec is not null) GROUP BY sensor_id ORDER BY model")
+        con = sqlite3.connect(DATABASE)
+	cur = con.cursor()
+	cur.execute("SELECT sensor_id, model FROM sensors where model <> '' and date_created > datetime('now', '-1 week') and (temperature_C_dec is not null or humidity_dec is not null) GROUP BY sensor_id ORDER BY model")
 	for row in cur.fetchall():
 	    if row[0]:
                 result.append("/data_{1}_3 - {0}".format(row[1], row[0]))	    
-	cur.close
+	con.close()
 	return result
 
     def getSensorData(self, sensorid, limit):
 	temps = []
-        cur = self.db.cursor()
-	cur.execute("SELECT time, temperature_C_dec FROM sensors where sensor_id = {0} AND temperature_C_dec IS NOT NULL ORDER BY date_created DESC limit {1}".format(sensorid, limit))
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
+	cur.execute("SELECT time, temperature_C_dec FROM sensors where sensor_id = {0} AND temperature_C_dec IS NOT NULL ORDER BY time DESC limit {1}".format(sensorid, limit))
 	for row in cur.fetchall():
 	    temps.append("{0}: {1} °C".format(row[0], row[1]))
-	cur.close
 	humis = []
-	cur = self.db.cursor()
-        cur.execute("SELECT time, humidity_dec FROM sensors where sensor_id = {0} AND humidity_dec IS NOT NULL ORDER BY date_created DESC limit {1}".format(sensorid, limit))
+	cur = con.cursor()
+        cur.execute("SELECT time, humidity_dec FROM sensors where sensor_id = {0} AND humidity_dec IS NOT NULL ORDER BY time DESC limit {1}".format(sensorid, limit))
 	for row in cur.fetchall():
 	    humis.append("{0}: {1} %".format(row[0], row[1]))
-	cur.close
+	con.close()
 	result = []
 	result.append("Temperatur:")
 	result.extend(temps)
@@ -239,9 +247,7 @@ class DataProvider:
 	result.extend(humis)
 	return result
 
-db = MySQLdb.connect(host=config.get('Database', 'host', 1), user=config.get('Database', 'user', 1), passwd=config.get('Database', 'pw', 1), db=config.get('Database', 'db', 1), charset="utf8") 
-db.autocommit(True) 
-prov = DataProvider(db)
+prov = DataProvider()
 errorMsg = "Das habe ich nicht verstanden ..."
 helpMsg = """
 /lastTemp - Liefert aktuelle Temperaturwerte
