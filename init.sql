@@ -107,3 +107,6 @@ CREATE INDEX date_created_idx ON sensors ( date_created );
 CREATE INDEX "idx_sensor_id" ON "sensors" (sensor_id);
 CREATE INDEX "idx_sensors_time" ON "sensors" (time);
 CREATE INDEX "idx_sensor_id_time" ON "sensors" (sensor_id,time);
+CREATE INDEX "idx_sensor_id_time_temp" ON "sensors" (sensor_id,time,temperature_C_dec);
+CREATE INDEX "idx_sensor_id_time_humi" ON "sensors" (sensor_id,time,humidity_dec);
+

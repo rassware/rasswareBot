@@ -13,10 +13,10 @@ make
 make install
 ```
 
-### Install MySQL database
+### Install SQLite database
 
 ```bash
-sudo apt-get install mysql-server
+sudo apt-get install sqlite3
 ```
 
 ### Checkout rasswareBot
@@ -27,7 +27,7 @@ git clone https://github.com/rassware/rasswareBot.git
 
 ### Database initialization
 
-Run init.sql for creating the database (change password for user!)
+Run init.sql for creating the database
 
 ### Install Telegram/Python framwork 'telepot'
 

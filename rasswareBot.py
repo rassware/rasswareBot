@@ -40,7 +40,7 @@ class DataProvider:
     lastOpenWeatherCheck = None
 
     def getLastValues(self,field):
-        sql = "select model, sensor_id, time, {0} from sensors where id in (select max(id) from sensors group by sensor_id) and time > datetime('now', '-6 hour') and {0} is not null and sensor_id > 0;".format(field)
+        sql = "select model, sensor_id, time, {0} from sensors where id in (select max(id) from sensors where time > datetime('now', '-6 hour') and {0} is not null and sensor_id > 0 group by sensor_id);".format(field)
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
         a = cur.execute(sql)
@@ -59,9 +59,9 @@ class DataProvider:
 
     def getLastNightTemperatures(self):
         sql = """select model, sensor_id, min(temperature_C_dec), max(temperature_C_dec) from sensors where 
-                 time between subdate(concat(cast(date(current_timestamp()) as char),' 06:00:00.0'), interval 12 hour) and concat(cast(date(current_timestamp()) as char),' 06:00:00.0') and
+                 time between datetime(date(CURRENT_TIMESTAMP, '-1 day'), '20:00:00') and datetime(date(CURRENT_TIMESTAMP), '08:00:00') and
                  temperature_C_dec is not null and sensor_id > 0
-                 group by model, sensor_id"""
+                 group by sensor_id"""
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
         a = cur.execute(sql)
@@ -220,7 +220,7 @@ class DataProvider:
 	result = []
         con = sqlite3.connect(DATABASE)
 	cur = con.cursor()
-	cur.execute("SELECT sensor_id, model FROM sensors where model <> '' and date_created > datetime('now', '-1 week') and (temperature_C_dec is not null or humidity_dec is not null) GROUP BY sensor_id ORDER BY model")
+	cur.execute("SELECT sensor_id, model FROM sensors where time > datetime('now', '-24 hour') GROUP BY sensor_id ORDER BY model;")
 	for row in cur.fetchall():
 	    if row[0]:
                 result.append("/data_{1}_3 - {0}".format(row[1], row[0]))	    
