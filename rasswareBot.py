@@ -119,7 +119,7 @@ class DataProvider:
     def updateLastAlert(self, chatId, sensor_id, last_alert):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert, chatId, sensor_id))
+        cur.execute("UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert.strftime("%Y-%m-%d %H:%M:%S"), chatId, sensor_id))
         con.commit()
         con.close()
 
@@ -360,7 +360,7 @@ while 1:
                 sensor_id = registered[1]
                 last_alert = registered[2]
 	        if prov.checkForFrost(sensor_id) == True and (last_alert == None or datetime.datetime.now() > last_alert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay')))): 
-                    prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now())
+                    prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                     bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
     except Exception as e:
         print e.__doc__
