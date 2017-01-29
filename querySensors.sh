@@ -6,7 +6,7 @@
 pkill rtl_433
 
 #run 2 mins for data
-/usr/local/bin/rtl_433 -F csv -T 120 > /media/fritzbox-usb/raspi/sensors.csv
+/usr/local/bin/rtl_433 -F csv -T 120 -p -32 > /media/fritzbox-usb/raspi/sensors.csv
 
 # import file to database
 echo -e "DROP TABLE IF EXISTS import_sensors;" | sqlite3 /media/fritzbox-usb/raspi/databases/climadb.db

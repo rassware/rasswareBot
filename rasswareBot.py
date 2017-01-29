@@ -119,7 +119,7 @@ class DataProvider:
     def updateLastAlert(self, chatId, sensor_id, last_alert):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert.strftime("%Y-%m-%d %H:%M:%S"), chatId, sensor_id))
+        cur.execute("UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert, chatId, sensor_id))
         con.commit()
         con.close()
 
