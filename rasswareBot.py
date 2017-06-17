@@ -40,7 +40,7 @@ class DataProvider:
     lastOpenWeatherCheck = None
 
     def getLastValues(self,field):
-        sql = "select model, sensor_id, time, {0} from sensors where id in (select max(id) from sensors where time > datetime('now', '-6 hour') and {0} is not null and sensor_id > 0 group by sensor_id);".format(field)
+        sql = "select model, sensor_id, time, {0} from sensors where id in (select max(id) from sensors where time between datetime(CURRENT_TIMESTAMP, '-6 hour', 'localtime') and datetime(CURRENT_TIMESTAMP, 'localtime') and {0} is not null and sensor_id > 0 group by sensor_id);".format(field)
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
         a = cur.execute(sql)
