@@ -137,7 +137,7 @@ class DataProvider:
     def getWeatherInfo(self):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,date_created FROM open_weather ORDER BY id DESC LIMIT 1")
+        cur.execute("SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,datetime(date_created, 'localtime') FROM open_weather ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         description = row[0].encode('utf-8')
         pressure = float(row[1])
