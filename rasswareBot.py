@@ -31,6 +31,8 @@ config.read(home + "/.rasswareBotConfig")
 
 DATEFORMAT = config.get('rasswareBot', 'dateformat', 1)
 DATABASE = config.get('Database', 'path', 1)
+ADMINCHATID = int(config.get('Telegram', 'adminchatid', 1))
+WEBCAMIMAGE = config.get('rasswareBot', 'webcamimage', 1)
 
 class DataProvider:
 
@@ -105,7 +107,7 @@ class DataProvider:
     def registerForAlert(self, chatId, sensor_id):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("INSERT IGNORE INTO registered(chatid, sensor_id) VALUES ({0}, {1});".format(chatId, sensor_id))
+        cur.execute("INSERT OR IGNORE INTO registered(chatid, sensor_id) VALUES ({0}, {1});".format(chatId, sensor_id))
         con.commit()
         con.close()
 
@@ -327,7 +329,10 @@ def handle(msg):
         else:
 	    bot.sendMessage(chat_id, "\n".join(prov.getSensorData(sensorid, limit)))
     elif command == "/help":
-        bot.sendMessage(chat_id, helpMsg)
+        bot.sendMessage(chat_id, helpMsg + "/webcam - Webcam Bild" if chat_id == ADMINCHATID else helpMsg)
+    elif command == "/webcam" and chat_id == ADMINCHATID:
+        f = open(WEBCAMIMAGE, 'rb')
+        bot.sendPhoto(ADMINCHATID, f)
     else:
         bot.sendMessage(chat_id, errorMsg)
 
