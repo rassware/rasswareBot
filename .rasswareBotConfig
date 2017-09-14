@@ -5,6 +5,7 @@ path: <path to sqlite database>
 
 [Telegram]
 token: <token>
+adminchatid: <chat id with privileges>
 
 [OpenWeatherMap]
 key: <api key>
@@ -22,6 +23,7 @@ frostcheckinterval: <minutes between frost checks>
 frostalertdelay: <minutes between frost alerts>
 frosttriggertemp: <trigger temperatur for frost alert>
 dateformat: "%Y-%m-%d %H:%M:%S"
+webcamimage: <location webcam image>
 
 [WetterArchiv]
 id: <id>
