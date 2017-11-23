@@ -15,13 +15,16 @@ from os.path import expanduser
 # https://github.com/nickoala/telepot/issues/87#issuecomment-235173302
 import telepot.api
 import urllib3
+import subprocess
 
 telepot.api._pools = {
     'default': urllib3.PoolManager(num_pools=3, maxsize=10, retries=3, timeout=30),
 }
 
+
 def force_independent_connection(req, **user_kw):
     return None
+
 
 telepot.api._which_pool = force_independent_connection
 
@@ -33,16 +36,18 @@ DATEFORMAT = config.get('rasswareBot', 'dateformat', 1)
 DATABASE = config.get('Database', 'path', 1)
 ADMINCHATID = int(config.get('Telegram', 'adminchatid', 1))
 WEBCAMIMAGE = config.get('rasswareBot', 'webcamimage', 1)
+AUDIOFILE = config.get('rasswareBot', 'audiofile', 1)
+
 
 class DataProvider:
-
     tempField = "temperature_C_dec"
     humiField = "humidity_dec"
     lastCheck = datetime.datetime.now()
     lastOpenWeatherCheck = None
 
-    def getLastValues(self,field):
-        sql = "select model, sensor_id, time, {0} from sensors where id in (select max(id) from sensors where time between datetime(CURRENT_TIMESTAMP, '-6 hour', 'localtime') and datetime(CURRENT_TIMESTAMP, 'localtime') and {0} is not null and sensor_id > 0 group by sensor_id);".format(field)
+    def getLastValues(self, field):
+        sql = "select model, sensor_id, time, {0} from sensors where id in (select max(id) from sensors where time between datetime(CURRENT_TIMESTAMP, '-6 hour', 'localtime') and datetime(CURRENT_TIMESTAMP, 'localtime') and {0} is not null and sensor_id > 0 group by sensor_id);".format(
+            field)
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
         a = cur.execute(sql)
@@ -61,9 +66,9 @@ class DataProvider:
 
     def getLastNightTemperatures(self):
         sql = """select model, sensor_id, min(temperature_C_dec), max(temperature_C_dec) from sensors where 
-                 time between datetime(date(CURRENT_TIMESTAMP, '-1 day'), '20:00:00') and datetime(date(CURRENT_TIMESTAMP), '08:00:00') and
-                 temperature_C_dec is not null and sensor_id > 0
-                 group by sensor_id"""
+				 time between datetime(date(CURRENT_TIMESTAMP, '-1 day'), '20:00:00') and datetime(date(CURRENT_TIMESTAMP), '08:00:00') and
+				 temperature_C_dec is not null and sensor_id > 0
+				 group by sensor_id"""
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
         a = cur.execute(sql)
@@ -94,7 +99,7 @@ class DataProvider:
         data = self.getLastValues(self.humiField)
         for i in data:
             result.append("{0}[{1}]\n{2}: {3}{4}".format(i[0], i[1], i[2], i[3], label))
-        return result 
+        return result
 
     def checkForFrost(self, sensor_id):
         data = self.getLastValues(self.tempField)
@@ -121,7 +126,10 @@ class DataProvider:
     def updateLastAlert(self, chatId, sensor_id, last_alert):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert, chatId, sensor_id))
+        cur.execute(
+            "UPDATE registered SET last_alert = '{0}' WHERE chatid = {1} and sensor_id = {2};".format(last_alert,
+                                                                                                      chatId,
+                                                                                                      sensor_id))
         con.commit()
         con.close()
 
@@ -139,7 +147,8 @@ class DataProvider:
     def getWeatherInfo(self):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,datetime(date_created, 'localtime') FROM open_weather ORDER BY id DESC LIMIT 1")
+        cur.execute(
+            "SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,datetime(date_created, 'localtime') FROM open_weather ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
         description = row[0].encode('utf-8')
         pressure = float(row[1])
@@ -149,11 +158,13 @@ class DataProvider:
         sunset = datetime.datetime.strptime(str(row[5]), DATEFORMAT).strftime('%H:%M:%S')
         date_created = str(row[6])
         con.close()
-        return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4}°\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(date_created,description,pressure,wind_speed,wind_deg,sunrise,sunset)
+        return "Wetterdaten von {0}\n{1}\nLuftdruck: {2} hPa\nWindstärke: {3} m/s\nWindrichtung: {4}°\nSonnenaufgang: {5}\nSonnenuntergang: {6}".format(
+            date_created, description, pressure, wind_speed, wind_deg, sunrise, sunset)
 
     def queryOpenWeather(self):
         self.lastOpenWeatherCheck = datetime.datetime.now()
-        url = "http://api.openweathermap.org/data/2.5/weather?id={}&lang=de&units=metric&APPID={}".format(config.get('OpenWeatherMap', 'cityid', 1), config.get('OpenWeatherMap', 'key', 1))
+        url = "http://api.openweathermap.org/data/2.5/weather?id={}&lang=de&units=metric&APPID={}".format(
+            config.get('OpenWeatherMap', 'cityid', 1), config.get('OpenWeatherMap', 'key', 1))
         response = requests.post(url)
         print "Query OpenWeather API ..."
         try:
@@ -162,11 +173,13 @@ class DataProvider:
             cur = con.cursor()
             description = data['weather'][0].get('description', 'no data').encode('utf8')
             pressure = data['main'].get('pressure', 0)
-            wind_speed =  data['wind'].get('speed', 0)
+            wind_speed = data['wind'].get('speed', 0)
             wind_deg = data['wind'].get('deg', 0)
             sunrise = data['sys'].get('sunrise', datetime.datetime.now())
             sunset = data['sys'].get('sunset', datetime.datetime.now())
-            cur.execute("INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},datetime({4},'unixepoch','localtime'),datetime({5},'unixepoch','localtime'))".format(description, pressure, wind_speed, wind_deg, sunrise, sunset))
+            cur.execute(
+                "INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},datetime({4},'unixepoch','localtime'),datetime({5},'unixepoch','localtime'))".format(
+                    description, pressure, wind_speed, wind_deg, sunrise, sunset))
             con.commit()
             con.close()
         except ValueError:
@@ -175,10 +188,12 @@ class DataProvider:
     def sendOpenWeather(self):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        cur.execute(
+            "SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         temp = row[0]
-        cur.execute("SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        cur.execute(
+            "SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         humi = row[0]
         con.close()
@@ -195,10 +210,12 @@ class DataProvider:
     def sendWetterArchiv(self):
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-        cur.execute("SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        cur.execute(
+            "SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         temp = row[0]
-        cur.execute("SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+        cur.execute(
+            "SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         humi = row[0]
         con.close()
@@ -219,35 +236,51 @@ class DataProvider:
         return data
 
     def getSensors(self):
-	result = []
-        con = sqlite3.connect(DATABASE)
-	cur = con.cursor()
-	cur.execute("SELECT sensor_id, model FROM sensors where time > datetime('now', '-24 hour') GROUP BY sensor_id ORDER BY model;")
-	for row in cur.fetchall():
-	    if row[0]:
-                result.append("/data_{1}_3 - {0}".format(row[1], row[0]))	    
-	con.close()
-	return result
-
-    def getSensorData(self, sensorid, limit):
-	temps = []
+        result = []
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
-	cur.execute("SELECT time, temperature_C_dec FROM sensors where sensor_id = {0} AND temperature_C_dec IS NOT NULL ORDER BY time DESC limit {1}".format(sensorid, limit))
-	for row in cur.fetchall():
-	    temps.append("{0}: {1} °C".format(row[0], row[1]))
-	humis = []
-	cur = con.cursor()
-        cur.execute("SELECT time, humidity_dec FROM sensors where sensor_id = {0} AND humidity_dec IS NOT NULL ORDER BY time DESC limit {1}".format(sensorid, limit))
-	for row in cur.fetchall():
-	    humis.append("{0}: {1} %".format(row[0], row[1]))
-	con.close()
-	result = []
-	result.append("Temperatur:")
-	result.extend(temps)
-	result.append("Luftfeuchte:")
-	result.extend(humis)
-	return result
+        cur.execute(
+            "SELECT sensor_id, model FROM sensors WHERE time > datetime('now', '-24 hour') GROUP BY sensor_id ORDER BY model;")
+        for row in cur.fetchall():
+            if row[0]:
+                result.append("/data_{1}_3 - {0}".format(row[1], row[0]))
+        con.close()
+        return result
+
+    def getSensorData(self, sensorid, limit):
+        temps = []
+        con = sqlite3.connect(DATABASE)
+        cur = con.cursor()
+        cur.execute(
+            "SELECT time, temperature_C_dec FROM sensors where sensor_id = {0} AND temperature_C_dec IS NOT NULL ORDER BY time DESC limit {1}".format(
+                sensorid, limit))
+        for row in cur.fetchall():
+            temps.append("{0}: {1} °C".format(row[0], row[1]))
+        humis = []
+        cur = con.cursor()
+        cur.execute(
+            "SELECT time, humidity_dec FROM sensors where sensor_id = {0} AND humidity_dec IS NOT NULL ORDER BY time DESC limit {1}".format(
+                sensorid, limit))
+        for row in cur.fetchall():
+            humis.append("{0}: {1} %".format(row[0], row[1]))
+        con.close()
+        result = []
+        result.append("Temperatur:")
+        result.extend(temps)
+        result.append("Luftfeuchte:")
+        result.extend(humis)
+        return result
+
+    def recordAudio(self, length):
+        arecord = ('arecord -Dplughw:1,0 -traw -fS16_LE -r48k -d'+str(length)).split()
+        sox = 'sox -traw -r48k -es -b16 -c1 -V1 - -tmp3 -'.split()
+        with open(AUDIOFILE, "w") as f:
+            arecord_process = subprocess.Popen(arecord, stdout=subprocess.PIPE)
+            sox_process = subprocess.Popen(sox, stdin=arecord_process.stdout, stdout=subprocess.PIPE)
+            output = sox_process.communicate()[0]
+            f.write(output)
+            f.flush()
+
 
 prov = DataProvider()
 errorMsg = "Das habe ich nicht verstanden ..."
@@ -264,6 +297,7 @@ helpMsg = """
 /weather - Allgemeine Wetterdaten
 """
 
+
 def handle(msg):
     chat_id = msg['chat']['id']
     command = msg['text']
@@ -277,7 +311,7 @@ def handle(msg):
     elif command == '/weather':
         bot.sendMessage(chat_id, prov.getWeatherInfo() + "\n" + "\n".join(prov.getLastTemperatures()))
     elif command.startswith('/pressure'):
-        args = command.split(' ',1)
+        args = command.split(' ', 1)
         limit = int(args[-1]) if args[-1].isdigit() else 10
         if len(args) > 2 or limit > 100:
             bot.sendMessage(chat_id, "Syntax: \"/pressure <limit>\"\nLimit max 100")
@@ -288,7 +322,7 @@ def handle(msg):
                 result.append("{0}: {1} hPa".format(str(row[0]), float(row[1])))
             bot.sendMessage(chat_id, "\n".join(result))
     elif command.startswith('/graph'):
-        args = command.split('_',1)
+        args = command.split('_', 1)
         limit = int(args[-1]) if args[-1].isdigit() else 10
         if len(args) > 2 or limit > 100:
             bot.sendMessage(chat_id, "Syntax: \"/graph_<limit>\"\nLimit max 100")
@@ -300,10 +334,10 @@ def handle(msg):
                 x.append(str(row[0]))
                 y.append(float(row[1]))
             chartdata = [go.Scatter(x=x, y=y)]
-            url = py.plot(chartdata, filename = 'pressure') + ".png?v=" + str(randint(0,25000))
+            url = py.plot(chartdata, filename='pressure') + ".png?v=" + str(randint(0, 25000))
             bot.sendPhoto(chat_id, url)
     elif command.startswith('/register'):
-        args = command.split(' ',1)
+        args = command.split(' ', 1)
         sensor_id = str(args[-1])
         if len(args) > 2 or sensor_id.isdigit() == False:
             bot.sendMessage(chat_id, "Syntax: \"/register <sensor_id>\"")
@@ -311,7 +345,7 @@ def handle(msg):
             prov.registerForAlert(chat_id, sensor_id)
             bot.sendMessage(chat_id, "Erfolgreich registriert!")
     elif command.startswith('/unregister'):
-        args = command.split(' ',1)
+        args = command.split(' ', 1)
         sensor_id = str(args[-1])
         if len(args) > 2 or sensor_id.isdigit() == False:
             bot.sendMessage(chat_id, "Syntax: \"/unregister <sensor_id>\"")
@@ -321,18 +355,27 @@ def handle(msg):
     elif command == "/sensors":
         bot.sendMessage(chat_id, "\n".join(prov.getSensors()))
     elif command.startswith('/data'):
-	args = command.split('_',2)
-	sensorid = str(args[1])
+        args = command.split('_', 2)
+        sensorid = str(args[1])
         limit = int(args[-1]) if args[-1].isdigit() else 3
         if len(args) > 3 or limit > 100 or not sensorid:
             bot.sendMessage(chat_id, "Syntax: \"/data_<sensorid>_<limit>\"\nLimit max 100")
         else:
-	    bot.sendMessage(chat_id, "\n".join(prov.getSensorData(sensorid, limit)))
+            bot.sendMessage(chat_id, "\n".join(prov.getSensorData(sensorid, limit)))
     elif command == "/help":
-        bot.sendMessage(chat_id, helpMsg + "/webcam - Webcam Bild" if chat_id == ADMINCHATID else helpMsg)
+        bot.sendMessage(chat_id, helpMsg + "/webcam - Webcam Bild\n/audio <sec> - Audio" if chat_id == ADMINCHATID else helpMsg)
     elif command == "/webcam" and chat_id == ADMINCHATID:
         f = open(WEBCAMIMAGE, 'rb')
         bot.sendPhoto(ADMINCHATID, f)
+    elif command.startswith('/audio') and chat_id == ADMINCHATID:
+        args = command.split(' ', 2)
+        if args[1].isdigit():
+            length = int(args[1])
+        else:
+            length = 30
+        prov.recordAudio(length)
+        f = open(AUDIOFILE, 'rb')
+        bot.sendAudio(ADMINCHATID, f)
     else:
         bot.sendMessage(chat_id, errorMsg)
 
@@ -341,7 +384,8 @@ def handle(msg):
     summary = telepot.glance(msg, flavor=flavor)
     print flavor, summary
 
-bot = telepot.Bot(config.get('Telegram','token', 0))
+
+bot = telepot.Bot(config.get('Telegram', 'token', 0))
 bot.message_loop(handle)
 print 'Listening ...'
 
@@ -353,20 +397,24 @@ while 1:
             prov.queryOpenWeather()
             prov.sendOpenWeather()
             prov.sendWetterArchiv()
-        if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(minutes=int(config.get('OpenWeatherMap', 'interval'))):
+        if datetime.datetime.now() > prov.lastOpenWeatherCheck + datetime.timedelta(
+                minutes=int(config.get('OpenWeatherMap', 'interval'))):
             prov.queryOpenWeather()
             prov.sendOpenWeather()
             prov.sendWetterArchiv()
 
-        if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostcheckinterval'))):
+        if datetime.datetime.now() > prov.lastCheck + datetime.timedelta(
+                minutes=int(config.get('rasswareBot', 'frostcheckinterval'))):
             prov.lastCheck = datetime.datetime.now()
             for registered in prov.getRegistered():
                 chat_id = registered[0]
                 sensor_id = registered[1]
                 last_alert = registered[2]
-	        if prov.checkForFrost(sensor_id) == True and (last_alert == None or datetime.datetime.now() > last_alert + datetime.timedelta(minutes=int(config.get('rasswareBot', 'frostalertdelay')))): 
-                    prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                    bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
+            if prov.checkForFrost(sensor_id) == True and (
+                    last_alert == None or datetime.datetime.now() > last_alert + datetime.timedelta(
+                    minutes=int(config.get('rasswareBot', 'frostalertdelay')))):
+                prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
     except Exception as e:
         print e.__doc__
         print e.message
