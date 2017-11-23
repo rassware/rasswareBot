@@ -24,6 +24,7 @@ frostalertdelay: <minutes between frost alerts>
 frosttriggertemp: <trigger temperatur for frost alert>
 dateformat: "%Y-%m-%d %H:%M:%S"
 webcamimage: <location webcam image>
+audiofile: <location audio file>
 
 [WetterArchiv]
 id: <id>
