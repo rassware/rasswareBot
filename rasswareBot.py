@@ -58,7 +58,7 @@ class DataProvider:
             for row in cur.fetchall():
                 messzeit = datetime.datetime.strptime(str(row[2]), DATEFORMAT).strftime('%H:%M:%S')
                 sensor = str(row[0])
-                id = int(row[1])
+                id = row[1]
                 value = float(row[3])
                 data.append([sensor, id, messzeit, value])
         con.close()
