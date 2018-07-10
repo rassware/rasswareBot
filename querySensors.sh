@@ -7,7 +7,7 @@ pkill rtl_433
 pkill rtlclient
 
 #run 2 mins for data
-/usr/bin/timeout 120 scripts/raspi/rtlclient.sh -f 433920000 -a 192.168.78.28 -p 1234 -s 250000 | /usr/local/bin/rtl_433 -F csv -G -U -r /dev/stdin > /tmp/sensors.csv
+/usr/bin/timeout 120 /home/crassmann/scripts/raspi/rtlclient.sh -f 433920000 -a 192.168.78.28 -p 1234 -s 250000 | /usr/local/bin/rtl_433 -F csv -G -U -r /dev/stdin > /tmp/sensors.csv
 #/usr/local/bin/rtl_433 -F csv -T 120 -p -32 > /tmp/sensors.csv
 
 # import file to database

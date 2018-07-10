@@ -79,7 +79,7 @@ class DataProvider:
             for row in cur.fetchall():
                 minValue = float(row[2])
                 sensor = str(row[0])
-                id = int(row[1])
+                id = row[1]
                 maxValue = float(row[3])
                 data.append("{0}[{1}]\nmin: {2}{4} max: {3}{4}".format(sensor, id, minValue, maxValue, " °C"))
         con.close()
