@@ -190,11 +190,11 @@ class DataProvider:
         con = sqlite3.connect(DATABASE)
         cur = con.cursor()
         cur.execute(
-            "SELECT temperature_C_dec FROM sensors WHERE sensor_id = '3' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+            "SELECT temperature_C_dec FROM sensors WHERE sensor_id = '" + OUTDOORSENSORID + "' AND temperature_C_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         temp = row[0]
         cur.execute(
-            "SELECT humidity_dec FROM sensors WHERE sensor_id = '3' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
+            "SELECT humidity_dec FROM sensors WHERE sensor_id = '" + OUTDOORSENSORID + "' AND humidity_dec IS NOT NULL ORDER BY ID DESC LIMIT 1")
         row = cur.fetchone()
         humi = row[0]
         con.close()
