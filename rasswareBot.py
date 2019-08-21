@@ -30,7 +30,7 @@ telepot.api._which_pool = force_independent_connection
 
 config = ConfigParser.ConfigParser()
 home = expanduser("~")
-config.read(home + "/.rasswareBotConfig")
+config.read(home + "/.credentials/rasswareBotConfig")
 
 DATEFORMAT = config.get('rasswareBot', 'dateformat', 1)
 DATABASE = config.get('Database', 'path', 1)
