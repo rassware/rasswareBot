@@ -21,9 +21,9 @@ class SensorData:
         self.sensor_id = data['id']
         self.channel = ""
         self.temperature_C = ""
-        self.temperature_C_dec = 0
+        self.temperature_C_dec = ""
         self.humidity = ""
-        self.humidity_dec = 0
+        self.humidity_dec = ""
         if 'channel' in data.keys():
             self.channel = data['channel']
         if 'temperature_C' in data.keys():
@@ -37,20 +37,17 @@ class SensorData:
             self.temperature_C_dec = float((data['temperature_F'] - 32) * 5 / 9)
 
     def __str__(self):
-        return "time: %s, model: %s, sensor_id: %s, channel: %s, temperature_c: %s, temperature_c_dec: %s, humidity: %s, humidity: %s" % (
+        return "time: %s, model: %s, sensor_id: %s, channel: %s, temperature_c: %s, temperature_c_dec: %s, humidity: %s, humidity_dec: %s" % (
             self.time, self.model, self.sensor_id, self.channel, self.temperature_C, self.temperature_C_dec, self.humidity, self.humidity_dec)
 
     def write_sensor_data(self):
-        print(self)
         sql = """
-        INSERT INTO sensors('time','model','sensor_id','channel','temperature_C','temperature_C_dec','humidity','humidity_dec') VALUES 
+        INSERT INTO sensors('time','model','sensor_id','channel','temperature_C','temperature_C_dec','humidity','humidity_dec') VALUES (?,?,?,?,?,?,?,?)
         """
-        sql += """
-            ('%s','%s','%s','%s','%s',%f,'%s',%f)
-            """ % (self.time, self.model, self.sensor_id, self.channel, self.temperature_C, self.temperature_C_dec, self.humidity, self.humidity_dec)
         with sqlite3.connect(config.get('Database', 'path', 1)) as con:
             cur = con.cursor()
-            cur.execute(sql)
+            cur.execute(sql,
+                        (self.time, self.model, self.sensor_id, self.channel, self.temperature_C, self.temperature_C_dec, self.humidity, self.humidity_dec))
             con.commit()
 
 
