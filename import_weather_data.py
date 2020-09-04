@@ -21,9 +21,9 @@ class SensorData:
         self.sensor_id = data['id']
         self.channel = ""
         self.temperature_C = ""
-        self.temperature_C_dec = ""
+        self.temperature_C_dec = None
         self.humidity = ""
-        self.humidity_dec = ""
+        self.humidity_dec = None
         if 'channel' in data.keys():
             self.channel = data['channel']
         if 'temperature_C' in data.keys():
