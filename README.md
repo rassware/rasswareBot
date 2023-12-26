@@ -61,7 +61,8 @@ pip install --upgrade pip
 ```
 
 ### Start your bot
-
+```bash
+source .venv/bin/activate
 python rasswareBot.py
-
+```
 All done! Have fun with your new weather bot!
