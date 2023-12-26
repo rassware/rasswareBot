@@ -61,6 +61,13 @@ Follow the instructions on the page to get an API key
 
 Replace the placeholder with your values.
 
+### Create a virtual environment
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+```
+
 ### Start your bot
 
 python rasswareBot.py

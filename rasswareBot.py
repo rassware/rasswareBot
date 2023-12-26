@@ -10,12 +10,13 @@ import json
 import plotly.plotly as py
 import plotly.graph_objs as go
 from random import randint
-import ConfigParser
+import configparser
 from os.path import expanduser
 # https://github.com/nickoala/telepot/issues/87#issuecomment-235173302
 import telepot.api
 import urllib3
 import subprocess
+import traceback
 
 telepot.api._pools = {
     'default': urllib3.PoolManager(num_pools=3, maxsize=10, retries=3, timeout=30),
@@ -28,16 +29,16 @@ def force_independent_connection(req, **user_kw):
 
 telepot.api._which_pool = force_independent_connection
 
-config = ConfigParser.ConfigParser()
+config = configparser.RawConfigParser()
 home = expanduser("~")
 config.read(home + "/.credentials/rasswareBotConfig")
 
-DATEFORMAT = config.get('rasswareBot', 'dateformat', 1)
-DATABASE = config.get('Database', 'path', 1)
-ADMINCHATID = int(config.get('Telegram', 'adminchatid', 1))
-WEBCAMIMAGE = config.get('rasswareBot', 'webcamimage', 1)
-AUDIOFILE = config.get('rasswareBot', 'audiofile', 1)
-OUTDOORSENSORID = config.get('rasswareBot', 'outdoorsensorid', 1)
+DATEFORMAT = config.get('rasswareBot', 'dateformat')
+DATABASE = config.get('Database', 'path')
+ADMINCHATID = int(config.get('Telegram', 'adminchatid'))
+WEBCAMIMAGE = config.get('rasswareBot', 'webcamimage')
+AUDIOFILE = config.get('rasswareBot', 'audiofile')
+OUTDOORSENSORID = config.get('rasswareBot', 'outdoorsensorid')
 
 
 class DataProvider:
@@ -106,7 +107,7 @@ class DataProvider:
         data = self.getLastValues(self.tempField)
         for item in data:
             if item[3] < float(config.get('rasswareBot', 'frosttriggertemp')) and str(sensor_id) == str(item[1]):
-                print "Frost da! {0} °C, gemessen von sensor_id {1}".format(item[3], item[1])
+                print("Frost da! {0} °C, gemessen von sensor_id {1}".format(item[3], item[1]))
                 return True
         return False
 
@@ -151,7 +152,7 @@ class DataProvider:
         cur.execute(
             "SELECT description,pressure,wind_speed,wind_deg,sunrise,sunset,datetime(date_created, 'localtime') FROM open_weather ORDER BY id DESC LIMIT 1")
         row = cur.fetchone()
-        description = row[0].encode('utf-8')
+        description = row[0]
         pressure = float(row[1])
         wind_speed = float(row[2])
         wind_deg = float(row[3])
@@ -164,27 +165,26 @@ class DataProvider:
 
     def queryOpenWeather(self):
         self.lastOpenWeatherCheck = datetime.datetime.now()
-        url = "http://api.openweathermap.org/data/2.5/weather?id={}&lang=de&units=metric&APPID={}".format(
-            config.get('OpenWeatherMap', 'cityid', 1), config.get('OpenWeatherMap', 'key', 1))
+        url = "https://api.openweathermap.org/data/2.5/weather?id={}&lang=de&units=metric&APPID={}".format(
+            config.get('OpenWeatherMap', 'cityid'), config.get('OpenWeatherMap', 'key'))
         response = requests.post(url)
-        print "Query OpenWeather API ..."
+        print("Query OpenWeather API ...")
         try:
             data = json.loads(response.text)
             con = sqlite3.connect(DATABASE)
             cur = con.cursor()
-            description = data['weather'][0].get('description', 'no data').encode('utf8')
+            description = str(data['weather'][0].get('description', 'no data'))
             pressure = data['main'].get('pressure', 0)
             wind_speed = data['wind'].get('speed', 0)
             wind_deg = data['wind'].get('deg', 0)
             sunrise = data['sys'].get('sunrise', datetime.datetime.now())
             sunset = data['sys'].get('sunset', datetime.datetime.now())
             cur.execute(
-                "INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},datetime({4},'unixepoch','localtime'),datetime({5},'unixepoch','localtime'))".format(
-                    description, pressure, wind_speed, wind_deg, sunrise, sunset))
+                "INSERT INTO open_weather(description,pressure,wind_speed,wind_deg,sunrise,sunset) VALUES ('{0}',{1},{2},{3},datetime({4},'unixepoch','localtime'),datetime({5},'unixepoch','localtime'))".format(description, pressure, wind_speed, wind_deg, sunrise, sunset))
             con.commit()
             con.close()
         except ValueError:
-            print "Could not query OpenWeater API"
+            print("Could not query OpenWeater API")
 
     def sendOpenWeather(self):
         con = sqlite3.connect(DATABASE)
@@ -198,15 +198,10 @@ class DataProvider:
         row = cur.fetchone()
         humi = row[0]
         con.close()
-        lat = config.get('OpenWeatherMap', 'lat')
-        lng = config.get('OpenWeatherMap', 'lng')
-        alt = config.get('OpenWeatherMap', 'alt')
-        name = config.get('OpenWeatherMap', 'name', 1)
-        user = config.get('OpenWeatherMap', 'user', 1)
-        pw = config.get('OpenWeatherMap', 'pw', 1)
-        data = {'temp': temp, 'humidity': humi, 'lat': lat, 'long': lng, 'alt': alt, 'name': name}
-        response = requests.post('http://openweathermap.org/data/post', data, auth=(user, pw))
-        print "send data to OpenWeather API: " + response.text
+        station_id = config.get('OpenWeatherMap', 'stationid')
+        data = json.dumps([{"station_id": station_id, "dt": int(time.time()), "temperature": temp, "humidity": humi}])
+        response = requests.post('http://api.openweathermap.org/data/3.0/measurements?APPID={}'.format(config.get('OpenWeatherMap', 'key')), data=data, headers={"Content-Type": "application/json"})
+        print("send data to OpenWeather API: " + str(response.status_code))
 
     def sendWetterArchiv(self):
         con = sqlite3.connect(DATABASE)
@@ -225,8 +220,8 @@ class DataProvider:
         sid = config.get('WetterArchiv', 'sid')
         dtutc = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
         data = {'id': id, 'pwd': pwd, 'sid': sid, 'dtutc': dtutc, 'te': temp, 'hu': humi}
-        response = requests.get('http://interface.wetterarchiv.de/weather', params=data)
-        print "send data to WetterArchiv API: " + response.text
+        response = requests.get('https://interface.wetterarchiv.de/weather', params=data)
+        print("send data to WetterArchiv API: " + response.text)
 
     def getPressureHistory(self, limit):
         con = sqlite3.connect(DATABASE)
@@ -302,7 +297,7 @@ helpMsg = """
 def handle(msg):
     chat_id = msg['chat']['id']
     command = msg['text']
-    print 'Got command: %s' % command
+    print('Got command: %s' % command)
     if command == '/lastTemp':
         bot.sendMessage(chat_id, "\n".join(prov.getLastTemperatures()))
     elif command == '/lastHumi':
@@ -383,12 +378,12 @@ def handle(msg):
     flavor = telepot.flavor(msg)
 
     summary = telepot.glance(msg, flavor=flavor)
-    print flavor, summary
+    print(flavor, summary)
 
 
-bot = telepot.Bot(config.get('Telegram', 'token', 0))
+bot = telepot.Bot(config.get('Telegram', 'token'))
 bot.message_loop(handle)
-print 'Listening ...'
+print('Listening ...')
 
 # Keep the program running.
 while 1:
@@ -417,6 +412,7 @@ while 1:
                 prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
     except Exception as e:
-        print e.__doc__
-        print e.message
+        print(e.__doc__)
+        print(e)
+        print(traceback.format_exc())
 db.close()

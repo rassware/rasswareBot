@@ -11,12 +11,7 @@ adminchatid: <chat id with privileges>
 key: <api key>
 cityid: <city id>
 interval: <interval in minutes>
-user: <user>
-pw: <password>
-lat: <latidude>
-lng: <longitude>
-alt: <altidude>
-name: <weather station name>
+stationid: <weather station id>
 
 [rasswareBot]
 frostcheckinterval: <minutes between frost checks>
