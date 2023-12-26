@@ -17,6 +17,7 @@ import telepot.api
 import urllib3
 import subprocess
 import traceback
+import logging
 
 telepot.api._pools = {
     'default': urllib3.PoolManager(num_pools=3, maxsize=10, retries=3, timeout=30),
@@ -40,6 +41,7 @@ WEBCAMIMAGE = config.get('rasswareBot', 'webcamimage')
 AUDIOFILE = config.get('rasswareBot', 'audiofile')
 OUTDOORSENSORID = config.get('rasswareBot', 'outdoorsensorid')
 
+logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 
 class DataProvider:
     tempField = "temperature_C_dec"
@@ -107,7 +109,7 @@ class DataProvider:
         data = self.getLastValues(self.tempField)
         for item in data:
             if item[3] < float(config.get('rasswareBot', 'frosttriggertemp')) and str(sensor_id) == str(item[1]):
-                print("Frost da! {0} °C, gemessen von sensor_id {1}".format(item[3], item[1]))
+                logging.info("Frost da! {0} °C, gemessen von sensor_id {1}".format(item[3], item[1]))
                 return True
         return False
 
@@ -168,7 +170,7 @@ class DataProvider:
         url = "https://api.openweathermap.org/data/2.5/weather?id={}&lang=de&units=metric&APPID={}".format(
             config.get('OpenWeatherMap', 'cityid'), config.get('OpenWeatherMap', 'key'))
         response = requests.post(url)
-        print("Query OpenWeather API ...")
+        logging.info("Query OpenWeather API ...")
         try:
             data = json.loads(response.text)
             con = sqlite3.connect(DATABASE)
@@ -184,7 +186,7 @@ class DataProvider:
             con.commit()
             con.close()
         except ValueError:
-            print("Could not query OpenWeater API")
+            logging.info("Could not query OpenWeater API")
 
     def sendOpenWeather(self):
         con = sqlite3.connect(DATABASE)
@@ -201,7 +203,7 @@ class DataProvider:
         station_id = config.get('OpenWeatherMap', 'stationid')
         data = json.dumps([{"station_id": station_id, "dt": int(time.time()), "temperature": temp, "humidity": humi}])
         response = requests.post('http://api.openweathermap.org/data/3.0/measurements?APPID={}'.format(config.get('OpenWeatherMap', 'key')), data=data, headers={"Content-Type": "application/json"})
-        print("send data to OpenWeather API: " + str(response.status_code))
+        logging.info("send data to OpenWeather API: " + str(response.status_code))
 
     def sendWetterArchiv(self):
         con = sqlite3.connect(DATABASE)
@@ -221,7 +223,7 @@ class DataProvider:
         dtutc = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
         data = {'id': id, 'pwd': pwd, 'sid': sid, 'dtutc': dtutc, 'te': temp, 'hu': humi}
         response = requests.get('https://interface.wetterarchiv.de/weather', params=data)
-        print("send data to WetterArchiv API: " + response.text)
+        logging.info("send data to WetterArchiv API: " + response.text)
 
     def getPressureHistory(self, limit):
         con = sqlite3.connect(DATABASE)
@@ -297,7 +299,7 @@ helpMsg = """
 def handle(msg):
     chat_id = msg['chat']['id']
     command = msg['text']
-    print('Got command: %s' % command)
+    logging.info('Got command: %s' % command)
     if command == '/lastTemp':
         bot.sendMessage(chat_id, "\n".join(prov.getLastTemperatures()))
     elif command == '/lastHumi':
@@ -378,12 +380,12 @@ def handle(msg):
     flavor = telepot.flavor(msg)
 
     summary = telepot.glance(msg, flavor=flavor)
-    print(flavor, summary)
+    logging.info(flavor, summary)
 
 
 bot = telepot.Bot(config.get('Telegram', 'token'))
 bot.message_loop(handle)
-print('Listening ...')
+logging.info('Listening ...')
 
 # Keep the program running.
 while 1:
@@ -412,7 +414,7 @@ while 1:
                 prov.updateLastAlert(chat_id, sensor_id, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 bot.sendMessage(chat_id, "FROSTWARNUNG!!!111elf\n{}".format("\n".join(prov.getLastTemperatures())))
     except Exception as e:
-        print(e.__doc__)
-        print(e)
-        print(traceback.format_exc())
+        logging.error(e.__doc__)
+        logging.error(e)
+        logging.error(traceback.format_exc())
 db.close()
