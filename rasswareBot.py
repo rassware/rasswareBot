@@ -380,7 +380,7 @@ def handle(msg):
     flavor = telepot.flavor(msg)
 
     summary = telepot.glance(msg, flavor=flavor)
-    logging.info(flavor, summary)
+    logging.info(summary)
 
 
 bot = telepot.Bot(config.get('Telegram', 'token'))
