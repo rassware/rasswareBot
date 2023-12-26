@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import ConfigParser
+import configparser
 import datetime
 import json
 import os
@@ -8,7 +8,7 @@ import sqlite3
 
 directory = '/home/crassmann/transfer/'
 
-config = ConfigParser.ConfigParser()
+config = configparser.ConfigParser()
 home_dir = os.path.expanduser('~')
 credential_dir = os.path.join(home_dir, '.credentials')
 config.read(os.path.join(credential_dir, 'weather_upload'))
