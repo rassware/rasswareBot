@@ -29,14 +29,6 @@ git clone https://github.com/rassware/rasswareBot.git
 
 Run init.sql for creating the database
 
-### Install Telegram/Python framwork 'telepot'
-
-```bash
-git clone https://github.com/nickoala/telepot.git
-cd telepot/
-sudo python setup.py install
-```
-
 ### Add the bash script to a crontab
 
 ```bash
