@@ -44,7 +44,7 @@ class SensorData:
         sql = """
         INSERT INTO sensors('time','model','sensor_id','channel','temperature_C','temperature_C_dec','humidity','humidity_dec') VALUES (?,?,?,?,?,?,?,?)
         """
-        with sqlite3.connect(config.get('Database', 'path', 1)) as con:
+        with sqlite3.connect(config.get('Database', 'path')) as con:
             cur = con.cursor()
             cur.execute(sql,
                         (self.time, self.model, self.sensor_id, self.channel, self.temperature_C, self.temperature_C_dec, self.humidity, self.humidity_dec))
