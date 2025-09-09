@@ -1,3 +1,4 @@
 requests
 telepot==12.7
 plotly==3.4.2
+paho-mqtt
