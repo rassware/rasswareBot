@@ -16,7 +16,7 @@ config.read(os.path.join(credential_dir, 'weather_upload'))
 
 class SensorData:
     def __init__(self, data):
-        self.time = datetime.datetime.strptime(data['time'], '%Y-%m-%d %H:%M:%S')
+        self.time = datetime.datetime.fromtimestamp(data['timestamp'] / 1000.0)
         self.model = data['model']
         self.sensor_id = data['id']
         self.channel = ""
